@@ -1,0 +1,110 @@
+@{title('账户')}
+
+@{head("../../assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.css")}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+	<li class="breadcrumb-item"><a href="#">Home</a></li>
+	<li class="breadcrumb-item active" aria-current="page">账户</li>
+</ol>
+@{end}
+<div class="card">
+	<div class="card-header">
+		<div class="row justify-content-end">
+			<button class="btn btn-success" id="sync-btn">
+				<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+				对账
+			</button>
+		</div>
+	</div>
+	<div class="card-body">
+		<div class="table-responsive">
+			<table id="account_table" class="table table-striped table-bordered">
+			</table>
+		</div>
+	</div>
+</div>
+
+<script src="../../assets/extra-libs/DataTables/datatables.min.js"></script>
+<script type="application/javascript">
+	$(function () {
+		const mainTable = $('#account_table').DataTable({
+			"searching": false,
+			// 是否允许排序
+			"ordering": true,
+			"order": [[3,'desc']],
+			"info": true,
+			// 是否允许翻页，设成false，翻页按钮不显示
+			"paging": true,
+			"lengthChange": false,
+			"pageLength": 5,
+			"pagingType": "numbers",
+			"autoWidth": true,
+			// 是否表示 "processing" 加载中的信息，这个信息可以修改
+			"processing": true,
+			// 每次创建是否销毁以前的DataTable,默认false
+			"destroy": false,
+			"serverSide": true,
+			"ajax": {
+				// url可以直接指定远程的json文件，或是MVC的请求地址 /Controller/Action
+				url: "/account",
+				type: 'POST',
+				// 传给服务器的数据，可以添加我们自己的查询参数
+				data: function (param) {
+					param.order.forEach(item=>{
+						item.column = param.columns[item.column].data;
+					});
+					delete param.columns;
+
+					return param;
+				},
+				dataFilter: function(data){
+					var json = jQuery.parseJSON( data );
+					json.recordsTotal = json.total;
+					json.recordsFiltered = json.total;
+					json.data = json.data;
+					return JSON.stringify( json ); // return JSON string
+				}
+			},
+			dataSrc: function (myJson) {
+				return myJson;
+			},
+			columns: [
+				{ title: 'ID', data: 'id', cellType: 'th' },
+				{ title: '交易所', data: 'marketplace', orderable: false },
+				{ title: '货币类型', data: 'currency' },
+				{ title: '可用额', data: 'available' },
+				{ title: '冻结额', data: 'locked' },
+				{
+					title: '操作',
+					data: null,
+					orderable: false,
+					render: function(data, type, row, meta) {
+						if (type === 'display') {
+							return '<a class="btn btn-info" href="/account_log/' + row.id + '/">日志</a>';
+						}
+
+						return data;
+					}
+				}
+			]
+		});
+
+		$('#sync-btn').on('click', function() {
+			$('#sync-btn').addClass('disabled');
+
+			$.ajax({
+				url: "/account_sync",
+				type: "POST",
+				data: {},
+				dataType: 'json',
+				success: function (res) {
+					$('#sync-btn').removeClass('disabled');
+					if (res.code === 200) {
+						mainTable.ajax.reload();
+					}
+				}
+			});
+		});
+	});
+</script>
