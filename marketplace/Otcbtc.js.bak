@@ -1,0 +1,63 @@
+const Marketplace = require('./Marketplace');
+const request = require('../definitions/request');
+const crypto = require('crypto');
+
+const Market = require('./response/Market');
+const Depth = require('./response/Depth');
+const Account = require('./response/Account');
+
+class Otcbtc extends Marketplace {
+
+    static getSignature(payload) {
+        return Buffer.from(
+                crypto.createHmac('SHA256', process.env.OTCBTC_API_SECRET).update(payload).digest('hex')
+            ).toString();
+    }
+
+    async getMarkets() {
+        const url = process.env.OTCBTC_ENDPOINT + 'markets';
+        const res = JSON.parse(await request(url));
+        const markets = [];
+        res.forEach(({ticker_id, trading_rule: {min_amount, min_price}}) => {
+            markets.push(
+                new Market(
+                    ticker_id.toLowerCase(),
+                    min_amount,
+                    min_price
+                )
+            );
+        });
+
+        return markets;
+    }
+
+    async getDepth(size){
+        const url = process.env.OTCBTC_ENDPOINT + 'depth?market=' + this.market.replace('_', '') + '&limit=' + size;
+        const res = JSON.parse(await request(url));
+        const depth = new Depth(size, res.asks, res.bids, res.timestamp);
+        return depth;
+    }
+
+    async getAccount(currency) {
+        const nonce = new Date().getTime();
+        const params = 'access_key='+process.env.OTCBTC_API_KEY+'&currency='+currency+'&nonce='+nonce;
+        const signature = Otcbtc.getSignature('GET|/api/v2/account|'+params);
+        const url = process.env.OTCBTC_ENDPOINT + 'account?' + params + '&signature='+signature;
+        const res = JSON.parse(await request(url));
+        const account = new Account(res.currency, res.balance, res.locked, res.saving);
+        return account;
+    }
+
+    getFee(amount) {
+        return parseFloat(amount) * 0.1 / 100;
+    }
+
+    //静态函数
+    static sayHello(name){
+        //修改静态变量
+        this.para = name;
+        return 'Hello, ' + name;
+    }
+}
+
+exports = module.exports = Otcbtc;

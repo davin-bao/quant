@@ -1,0 +1,235 @@
+@{title('交易对')}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+	<li class="breadcrumb-item"><a href="#">Home</a></li>
+	<li class="breadcrumb-item active" aria-current="page">交易对</li>
+</ol>
+@{end}
+<div class="card">
+	<div class="card-body">
+		<h5 class="card-title">交易对</h5>
+		<div class="table-responsive">
+			<table id="zero_config" class="table table-striped table-bordered">
+				<thead>
+				<tr>
+					<th scope="col">ID</th>
+					<th scope="col">状态</th>
+					<th scope="col">货币对</th>
+					<th scope="col">买方市场</th>
+					<th scope="col">卖方市场</th>
+					<th scope="col">买入价</th>
+					<th scope="col">卖出价</th>
+					<th scope="col">交易量</th>
+					<th scope="col">利润</th>
+					<th scope="col">交易结果</th>
+					<th scope="col">开始时间</th>
+					<th scope="col">结束时间</th>
+					<th scope="col">订单</th>
+				</tr>
+				</thead>
+				<tbody id="hedge-body"></tbody>
+			</table>
+		</div>
+	</div>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1" role="dialog" aria-labelledby="orderModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-xl" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="orderModalLabel">订单详情</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<table style="width: 100%;">
+					<thead class="thead-dark">
+						<tr>
+							<th scope="col">ID</th>
+							<th>交易方向</th>
+							<th>货币对</th>
+							<th>状态</th>
+							<th>交易量</th>
+							<th>剩余量</th>
+							<th>已交易量</th>
+							<th>价格</th>
+							<th>平均价</th>
+							<th>时间</th>
+						</tr>
+					</thead>
+					<tbody id="order-body"></tbody>
+				</table>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="accountModal" tabindex="-1" role="dialog" aria-labelledby="accountModalLabel" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="accountModalLabel">账户详情</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+                <table style="width: 100%;">
+                    <thead class="thead-dark">
+                    <tr>
+                        <th scope="col">ID</th>
+                        <th>市场</th>
+                        <th>货币</th>
+                        <th>可用余额</th>
+                        <th>冻结</th>
+                        <th>冻结</th>
+                        <th>解冻</th>
+                    </tr>
+                    </thead>
+                    <tbody id="account-body"></tbody>
+                </table>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="application/javascript">
+	refreshTable();
+	// setInterval(refreshTable, 10000);
+
+	function orderDetail(id){
+		$.ajax({
+			url: "/orders",
+			type: "POST",
+			data: {'hedge_id': id},
+			dataType: 'json',
+			success: function(res){
+				if(res.code === 200){
+                    let domRowContent = '';
+                        $.each(res.data, function(key, item) {
+						let domId = '<th scope="row">'+item.order_id+'</th>';
+						let domSide = '<td><a id="account-'+item.market+'-'+item.marketplace+'" onclick="onAccountDetail(\''+item.market+'\',\''+item.marketplace+'\')">'+item.side+' '+item.marketplace+'</a></td>';
+						let domMarket = '<td>'+item.market+'</td>';
+						let domState = '<td>'+item.state+'</td>';
+						let domVolume = '<td>'+toFixed(item.volume, 8)+'</td>';
+						let domRemainingVolume = '<td>'+toFixed(item.remaining_volume,8)+'</td>';
+						let domExecutedVolume = '<td>'+toFixed(item.executed_volume,8)+'</td>';
+						let domPrice = '<td>'+toFixed(item.price, 8)+'</td>';
+						let domAvgPrice = '<td>'+toFixed(item.avg_price, 8)+'</td>';
+						let domCTime = '<td>'+item.ctime+'</td>';
+						domRowContent += '<tr>' +
+                                domId +
+                                domSide +
+								domMarket +
+								domState +
+								domVolume +
+								domRemainingVolume +
+								domExecutedVolume +
+								domPrice +
+								domAvgPrice +
+								domCTime +
+                        '</tr>';
+					});
+
+                    let domOrderBody = $('#order-body');
+                    domOrderBody.empty();
+                    domOrderBody.append(domRowContent);
+                    $('#orderModal').modal('show');
+				}
+			}});
+	}
+
+	function onAccountDetail(market, marketplace){
+        $.ajax({
+            url: "/account",
+            type: "POST",
+            data: {'marketplace': marketplace, market: market},
+            dataType: 'json',
+            success: function(res){
+                if(res.code === 200){
+                    let domRowContent = '';
+                    $.each(res.data, function(key, item) {
+                        let domId = '<th scope="row">'+item.id+'</th>';
+						let domMarketplace = '<td>'+item.marketplace+'</td>';
+						let domCurrency = '<td>'+item.currency+'</td>';
+						let domBalance = '<td>'+toFixed(item.balance, 8)+'</td>';
+                        let domLocked = '<td>'+toFixed(item.locked, 8)+'</td>';
+                        let domSaving = '<td>'+toFixed(item.saving, 8)+'</td>';
+                        let domFreeze = '<td>'+toFixed(item.freeze, 8)+'</td>';
+                        domRowContent += '<tr>' +
+                            domId +
+                            domMarketplace +
+                            domCurrency +
+                            domBalance +
+                            domLocked +
+                            domSaving +
+                            domFreeze +
+                            '</tr>';
+                    });
+
+					let domAccountBody = $('#account-body');
+					domAccountBody.empty();
+					domAccountBody.append(domRowContent);
+					$('#accountModal').modal('show');
+                }
+            }});
+    }
+
+	function refreshTable() {
+		const dataBody = $('#hedge-body');
+		$.ajax({
+			url: "/hedge",
+			type: "POST",
+			data: {},
+			dataType: 'json',
+			success: function(res){
+				if(res.code === 200){
+					$.each(res.data, function(key, item) {
+						let domId = '<th scope="row">'+item.id+'</th>';
+						let domState = '<td>'+item.state+'</td>';
+						let domMarket = '<td>'+item.market+'</td>';
+						let domMarketplaceBuy = '<td>'+item.marketplace_buy+'</td>';
+						let domMarketplaceSell = '<td>'+item.marketplace_sell+'</td>';
+						let domPriceBuy = '<td>'+toFixed(item.price_buy, 8)+'</td>';
+						let domPriceSell = '<td>'+ toFixed(item.price_sell, 8)+'</td>';
+						let domVolume = '<td>'+toFixed(item.volume, 8)+'</td>';
+						let domProfit = '<td>'+toFixed(item.profit, 8)+'</td>';
+						let domResult = '<td>'+item.result+'</td>';
+						let domSTime = '<td>'+item.stime+'</td>';
+						let domFTime = '<td>'+item.ftime+'</td>';
+						let domOrders = '<td><button name="order_detail" id="'+item.id+'" onclick="orderDetail('+item.id+')">详情</button></td>';
+						let domRowContent = domId +
+								domState +
+								domMarket +
+								domMarketplaceBuy +
+								domMarketplaceSell +
+								domPriceBuy +
+								domPriceSell +
+								domVolume +
+								domProfit +
+								domResult +
+								domSTime +
+								domFTime +
+								domOrders;
+
+						let domRow = $('tr#'+item.id);
+						if(domRow.length === 0){
+							domRow = '<tr id="'+item.id+'">' + domRowContent + '</tr>';
+							dataBody.append(domRow);
+						}else{
+							domRow.empty();
+							domRow.append(domRowContent);
+						}
+					});
+				}
+			}});
+	}
+</script>
