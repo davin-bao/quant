@@ -8,6 +8,7 @@ const Market = require('./response/Market');
 const Depth = require('./response/Depth');
 const Account = require('./response/Account');
 const Order = require('./response/Order');
+const OrderModel = require('../models/Order');
 
 class Zb extends Marketplace {
 
@@ -122,7 +123,7 @@ class Zb extends Marketplace {
         try{
             const res = JSON.parse(await request(url));
             if(res.code && parseInt(res.code) === 1000) {
-                return new Order(res.order_id || orderId, parseInt(res.code) === 1000, res.message || '', Order.CANCEL);
+                return new Order(res.order_id || orderId, parseInt(res.code) === 1000, res.message || '', OrderModel.CANCEL);
             }else{
                 return new Error(res.message, parseInt(res.code) || 1001);
             }
@@ -146,29 +147,30 @@ class Zb extends Marketplace {
 
         try{
             const res = JSON.parse(await request(url));
-            if(res.code && parseInt(res.code) === 1000){
-                let state = Order.TRADING;
-                switch (parseInt(res.state)) {
+
+            if(res.id){
+                let state = OrderModel.TRADING;
+                switch (parseInt(res.state|| res.status)) {
                     case 0:
                     case 3:
                     default:
-                        state = Order.TRADING;
+                        state = OrderModel.TRADING;
                         break;
                     case 1:
-                        state = Order.CANCEL;
+                        state = OrderModel.CANCEL;
                         break;
                     case 2:
-                        state = Order.FINISHED;
+                        state = OrderModel.FINISHED;
                         break;
                 }
-                new Order(
+                return new Order(
                     res.id,
                     true,
-                    '',
+                    'success',
                     state,
-                    Decimal(res.trade_money).sub(res.trade_amount).toNumber(),   //均价
-                    res.trade_amount,
-                    res.price
+                    Decimal(res.trade_money || 0).div(res.trade_amount || 0).toNumber(),   //均价
+                    res.trade_amount || 0,
+                    res.price || 0
                 );
             }else{
                 return new Error(res.message, parseInt(res.code) || 1001);

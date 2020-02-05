@@ -89,7 +89,7 @@ class Strategy {
                 if ((aBuyPrice - bSellPrice - aBuyFee - bSellFee) / ((aBuyPrice + bSellPrice) / 2) > safe_ratio) {
                     // 发起交易, A挂卖单，B挂买单
                     // Log.Info(__filename, 'market:'+this.market, '发起交易, A挂卖单:'+aBuyPrice+'，B挂买单:'+bSellPrice, (aBuyPrice - bSellPrice - aBuyFee - bSellFee));
-                    const createOrder = new CreateOrder(this.market, this.marketplaceB, this.marketplaceA, bSellFee, aBuyFee, volume);
+                    const createOrder = new CreateOrder(this.market, this.marketplaceB, this.marketplaceA, bSellPrice, aBuyPrice, volume);
                     await createOrder.createHedge();
                 }
             // }

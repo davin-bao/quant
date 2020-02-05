@@ -28,8 +28,9 @@ const handle = async () => {
             }
         }
     });
+
     loop(orders, (async order => {
-        if(!order || order.order_id === -1) return;
+        if(!order || order.order_id === '-1') return;
         const marketplace = order.marketplace;
 
         // 发起交易查询
@@ -39,11 +40,11 @@ const handle = async () => {
         if(orderResult instanceof Error){
             orderResult = {order_id: -1, state: Order.TRADING, error_message: orderResult.message};
         }
+
         const memo = orderResult.error_message;
         Log.Info(__filename, '查询交易 no：' + order.id + ',' + memo);
         await sequelize.transaction(async t=> {
             order.update({
-                order_id: orderResult.order_id,
                 state: orderResult.state,
                 avg_price: orderResult.avg_price || 0,
                 executed_volume: orderResult.executed_volume || 0,
@@ -56,8 +57,8 @@ const handle = async () => {
                 const currencyAdd = order.side === 'buy' ? currencies[0] : currencies[1];
                 const currencySub = order.side === 'buy' ? currencies[1] : currencies[0];
 
-                const accountAdd = Account.getByMarketplaceAndCurrency(order.marketplace, currencyAdd);
-                const accountSub = Account.getByMarketplaceAndCurrency(order.marketplace, currencySub);
+                const accountAdd = await Account.getByMarketplaceAndCurrency(order.marketplace, currencyAdd);
+                const accountSub = await Account.getByMarketplaceAndCurrency(order.marketplace, currencySub);
                 // 存入
                 await accountAdd.deposit(orderResult.executed_volume, {transaction: t, relate_id: order.id});
                 // 消费

@@ -12,7 +12,7 @@
 	<div class="card-header">
 		<div class="row justify-content-end">
 			<button class="btn btn-success" id="sync-btn">
-				<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+				<span id="loading" class="spinner-border spinner-border-sm hide" role="status" aria-hidden="true"></span>
 				对账
 			</button>
 		</div>
@@ -92,6 +92,7 @@
 
 		$('#sync-btn').on('click', function() {
 			$('#sync-btn').addClass('disabled');
+			$('#loading').removeClass('hide');
 
 			$.ajax({
 				url: "/account_sync",
@@ -99,10 +100,16 @@
 				data: {},
 				dataType: 'json',
 				success: function (res) {
-					$('#sync-btn').removeClass('disabled');
 					if (res.code === 200) {
 						mainTable.ajax.reload();
 					}
+				},
+				error: function(e){
+					alert(e.statusText);
+				},
+				complete: function(){
+					$('#sync-btn').removeClass('disabled');
+					$('#loading').addClass('hide');
 				}
 			});
 		});

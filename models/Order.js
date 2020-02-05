@@ -7,9 +7,9 @@ class Order extends Model {}
 Order.init({
     hedge_id: Sequelize.INTEGER,
     marketplace: Sequelize.STRING,
-    order_id: Sequelize.INTEGER,
+    order_id: Sequelize.STRING,
     market: Sequelize.STRING,
-    side: Sequelize.INTEGER,
+    side: Sequelize.STRING,
     volume: Sequelize.DECIMAL,
     remaining_volume: Sequelize.DECIMAL,
     executed_volume: Sequelize.DECIMAL,

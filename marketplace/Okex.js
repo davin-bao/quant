@@ -3,11 +3,13 @@ const request = require('../definitions/request');
 const { PublicClient, AuthenticatedClient } = require('@okfe/okex-node');
 const crypto = require('crypto');
 
+const Log = require('../definitions/Log');
 const Error = require('./response/Error');
 const Market = require('./response/Market');
 const Depth = require('./response/Depth');
 const Account = require('./response/Account');
 const Order = require('./response/Order');
+const OrderModel = require('../models/Order');
 
 const tunnel = require('tunnel');
 
@@ -47,6 +49,8 @@ class Okex extends Marketplace {
     async getMarkets() {
         const url = process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments';
         const res = JSON.parse(await request(url));
+
+        Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/markets', JSON.stringify(res));
         const markets = [];
         res.forEach((
             {
@@ -74,7 +78,7 @@ class Okex extends Marketplace {
                 size,
                 depth: 0.00000001
             });
-
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/book', JSON.stringify(res));
             return new Depth(size, res.asks || [], res.bids || [], res.timestamp || '');
         }catch(e){
             return new Error(e);
@@ -102,6 +106,7 @@ class Okex extends Marketplace {
         // }));
         try{
             const res = await this.authClient.spot().getAccounts(currency);
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/accounts', JSON.stringify(res));
             return new Account(res.id || 0, res.currency || '', res.available || 0, res.hold || 0);
         }catch(e){
             return new Error(e);
@@ -126,6 +131,7 @@ class Okex extends Marketplace {
 
         try{
             const res = await this.authClient.spot().getAccounts();
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/accounts', JSON.stringify(res));
             const coins = res || [];
             let accounts = [];
             coins.forEach(item => {
@@ -150,6 +156,7 @@ class Okex extends Marketplace {
         let res = {};
         try{
             res = await this.authClient.spot().postOrder(params);
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders', JSON.stringify(res));
             return new Order(res.order_id || -1, res.result || false, res.error_message || '');
         }catch(e){
             return new Error(e);
@@ -162,7 +169,8 @@ class Okex extends Marketplace {
         };
         try{
             const res = await this.authClient.spot().postCancelOrder(orderId, params);
-            return new Order(res.order_id || -1, res.result || false, res.error_message || '', res.result ? Order.CANCEL:Order.TRADING);
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/cancel_orders/' + orderId, JSON.stringify(res));
+            return new Order(res.order_id || -1, res.result || false, res.error_message || '', res.result ? OrderModel.CANCEL:OrderModel.TRADING);
         }catch(e){
             return new Error(e);
         }
@@ -174,25 +182,27 @@ class Okex extends Marketplace {
         };
         try{
             const res = await this.authClient.spot().getOrder(orderId, params);
-            let state = Order.TRADING;
+            Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders/' + orderId, JSON.stringify(res));
+            let state = OrderModel.TRADING;
+
             switch (parseInt(res.state)) {
                 case 0:
                 case 1:
                 case 3:
                 case 4:
                 default:
-                    state = Order.TRADING;
+                    state = OrderModel.TRADING;
                     break;
                 case -2:
                 case -1:
-                    state = Order.CANCEL;
+                    state = OrderModel.CANCEL;
                     break;
                 case 2:
-                    state = Order.FINISHED;
+                    state = OrderModel.FINISHED;
                     break;
             }
 
-            return new Order(res.order_id, res.result, res.error_message, res.state, res.price_avg, res.filled_size, res.filled_notional);
+            return new Order(res.order_id, res.result, res.error_message || res.status, state, res.price_avg, res.filled_size, res.price);
         }catch(e){
             return new Error(e);
         }

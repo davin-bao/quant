@@ -232,53 +232,7 @@ async function post_account_log_index() {
 
 async function post_account_sync() {
     const self = this;
-
-    const setting  = await Setting.instance();
-    const accounts = await Account.findAll();
-
-    const marketplaces =[];
-    accounts.forEach(account => {
-        if(!marketplaces[account.marketplace]){
-            marketplaces[account.marketplace] = [];
-        }
-        marketplaces[account.marketplace].push(account);
-    });
-
-    const marketplaceKeys = Object.keys(marketplaces);
-    for(let i=0; i<marketplaceKeys.length; i++){
-        const mp = MarketplaceManager.get(marketplaceKeys[i], setting.market);
-        const upstreamAccounts = await mp.getAccountList();
-
-        await sequelize.transaction(async t=> {
-            marketplaces[marketplaceKeys[i]].forEach(account => {
-                let upstreamAvailable = 0, upstreamLocked = 0;
-                upstreamAccounts.forEach(upstreamAccount => {
-                    if (upstreamAccount.currency === account.currency) {
-                        upstreamAvailable = upstreamAccount.available;
-                        upstreamLocked = upstreamAccount.locked;
-                    }
-                });
-
-                const available_change = Decimal(account.available).sub(upstreamAvailable).toNumber();
-                const locked_change = Decimal(account.locked).sub(upstreamLocked).toNumber();
-
-                const accountLog = new AccountLog({
-                    account_id: account.id,
-                    available_change: available_change,
-                    available: upstreamAvailable,
-                    locked_change: locked_change,
-                    locked: upstreamLocked,
-                    memo: '对账'
-                });
-                account.update({
-                    available: upstreamAvailable,
-                    locked: upstreamLocked
-                }, {transaction: t});
-
-                accountLog.save({transaction: t});
-            });
-        });
-    }
+    await Account.sync();
 
     self.json({code: 200, msg: 'success'});
 }

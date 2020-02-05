@@ -68,7 +68,6 @@ const handle = async () => {
         Log.Info(__filename, '查询交易 no：' + order.id + ',' + memo);
 
         order.update({
-            order_id: orderResult.order_id,
             state: orderResult.state,
             avg_price: orderResult.avg_price || 0,
             executed_volume: orderResult.executed_volume || 0,

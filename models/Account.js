@@ -1,7 +1,9 @@
 const Sequelize = require('sequelize');
 const Decimal = require('decimal');
 const sequelize = require('../definitions/sequelize');
+const MarketplaceManager = require('../marketplace/Manager');
 const Model = require('./Model');
+const Setting = require('./Setting');
 const AccountLog = require('./AccountLog');
 
 class Account extends Model {
@@ -96,6 +98,55 @@ Account.getByMarketplaceAndCurrency = function(marketplace, currency){
         }
     });
     return account;
+};
+
+Account.sync = async function() {
+    const setting  = await Setting.instance();
+    const accounts = await Account.findAll();
+
+    const marketplaces =[];
+    accounts.forEach(account => {
+        if(!marketplaces[account.marketplace]){
+            marketplaces[account.marketplace] = [];
+        }
+        marketplaces[account.marketplace].push(account);
+    });
+
+    const marketplaceKeys = Object.keys(marketplaces);
+    for(let i=0; i<marketplaceKeys.length; i++){
+        const mp = MarketplaceManager.get(marketplaceKeys[i], setting.market);
+        const upstreamAccounts = await mp.getAccountList();
+
+        await sequelize.transaction(async t=> {
+            marketplaces[marketplaceKeys[i]].forEach(account => {
+                let upstreamAvailable = 0, upstreamLocked = 0;
+                upstreamAccounts.forEach(upstreamAccount => {
+                    if (upstreamAccount.currency.toLowerCase() === account.currency.toLowerCase()) {
+                        upstreamAvailable = upstreamAccount.available;
+                        upstreamLocked = upstreamAccount.locked;
+                    }
+                });
+
+                const available_change = Decimal(account.available).sub(upstreamAvailable).toNumber();
+                const locked_change = Decimal(account.locked).sub(upstreamLocked).toNumber();
+
+                const accountLog = new AccountLog({
+                    account_id: account.id,
+                    available_change: available_change,
+                    available: upstreamAvailable,
+                    locked_change: locked_change,
+                    locked: upstreamLocked,
+                    memo: '对账'
+                });
+                account.update({
+                    available: upstreamAvailable,
+                    locked: upstreamLocked
+                }, {transaction: t});
+
+                accountLog.save({transaction: t});
+            });
+        });
+    }
 };
 
 exports = module.exports = Account;
