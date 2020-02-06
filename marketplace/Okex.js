@@ -156,19 +156,11 @@ class Okex extends Marketplace {
         try{
             res = await this.authClient.spot().postOrder(params);
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders', JSON.stringify(res));
+            if(res.error_code && parseInt(res.error_code) !== 0){
+                return this.Error(res);
+            }
             return new Order(res.order_id || -1, res.result || false, res.error_message || '');
         }catch(e){
-            let code = 1001;
-            switch (parseInt(e.response && e.response.data && e.response.data.code) || 1001) {
-                case 33014:  // OKEX
-                    this.code = 3001;
-                case 33017:  // 交易账户余额不足
-                    this.code = 2000;
-                case 33026:  // OKEX
-                    this.code = 3001;
-                default:
-                    code = 1001;
-            }
             return this.Error(e);
         }
     }
@@ -223,10 +215,10 @@ class Okex extends Marketplace {
     }
 
     Error(e){
-        const message = (e.response && e.response.data && e.response.data.message) || e.message || e || '通信失败';
+        const message = (e.response && e.response.data && e.response.data.message) || e.message || e.error_message || e || '通信失败';
 
         let code = Error.ERROR;
-        switch (parseInt(e.response && e.response.data && e.response.data.code) || 1001) {
+        switch (parseInt(e.error_code || e.response && e.response.data && e.response.data.code) || 1001) {
             case 33014:
                 code = Error.ERROR_ORDER_ID;    // 订单不存在(重复撤单，订单号不对等)
                 break;
@@ -243,6 +235,5 @@ class Okex extends Marketplace {
         return new Error(message, code);
     }
 }
-
 
 exports = module.exports = Okex;

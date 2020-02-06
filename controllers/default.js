@@ -6,6 +6,7 @@ const Order = require('../models/Order');
 const Account = require('../models/Account');
 const AccountLog = require('../models/AccountLog');
 const Setting = require('../models/Setting');
+const AccountStatistics = require('../models/AccountStatistics');
 const MarketplaceManager = require('../marketplace/Manager');
 
 const Op = Sequelize.Op;
@@ -18,6 +19,9 @@ exports.install = function() {
     ROUTE('GET /logout', get_logout,   ['authorize']);
 
     ROUTE('GET /dashboard',        get_dashboard, ['authorize', '@admin']);
+    ROUTE('GET /dashboard-account-statistics-chart', get_dashboard_account_statistics_chart, ['authorize', '@admin']);
+    ROUTE('GET /dashboard-hedge-profit-chart', get_dashboard_hedge_profit_chart, ['authorize', '@admin']);
+    ROUTE('GET /dashboard-hedge-success-chart', get_dashboard_hedge_success_chart, ['authorize', '@admin']);
     ROUTE('GET /',        get_hedge_index, ['authorize', '@admin']);
     ROUTE('GET /setting',   get_setting_detail, ['authorize', '@admin']);
     ROUTE('POST /setting',  post_setting_detail, ['authorize', '@admin']);
@@ -78,6 +82,130 @@ function get_logout() {
     self.cookie('__user', '', '-1 day');
 
     self.redirect('/');
+}
+
+async function get_dashboard_account_statistics_chart() {
+    const self = this;
+    const marketplace_a = 'zb';
+    const marketplace_b = 'okex';
+
+    const accountStatistics = await AccountStatistics.findAll({
+        where: {
+            marketplace_a,
+            marketplace_b
+        },
+        limit: 100,
+        order: [
+            ['id', 'DESC']
+        ]
+    });
+
+    let currency_a = '';
+    let currency_b = '';
+    const labels = [];
+    const amount = [];
+    const currency_a_a = [];
+    const currency_a_b = [];
+    const currency_b_a = [];
+    const currency_b_b = [];
+
+    for(const accountStatistic of accountStatistics){
+        if(currency_a === ''){
+            [currency_a, currency_b] = accountStatistic.market.trim().toUpperCase().split('_');
+        }
+        labels.unshift(accountStatistic.id);
+        amount.unshift(accountStatistic.amount);
+        currency_a_a.unshift(accountStatistic.currency_a_a);
+        currency_a_b.unshift(accountStatistic.currency_a_b);
+        currency_b_a.unshift(accountStatistic.currency_b_a);
+        currency_b_b.unshift(accountStatistic.currency_b_b);
+    }
+
+    const res = {
+        marketplace_a,
+        marketplace_b,
+        currency_a,
+        currency_b,
+        currency: currency_b,
+        labels
+    };
+
+    switch (parseInt(self.query.type)) {
+        case 0:
+        default:
+            res.amount_a = amount;
+            res.amount_b = amount;
+            break;
+        case 1:
+            res.currency = currency_a;
+            res.amount_a = currency_a_a;
+            res.amount_b = currency_b_a;
+            break;
+        case 2:
+            res.currency = currency_b;
+            res.amount_a = currency_a_b;
+            res.amount_b = currency_b_b;
+            break;
+        case 3:
+            res.amount_a = currency_a_a;
+            res.amount_b = currency_a_b;
+            break;
+        case 4:
+            res.amount_a = currency_b_a;
+            res.amount_b = currency_b_b;
+            break;
+    }
+
+    self.json({code: 200, msg: 'success', data: res});
+}
+
+async function get_dashboard_hedge_success_chart() {
+    const self = this;
+    const { total } = await Hedge.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']]
+    });
+
+    const { success } = await Hedge.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'success']],
+        where: {
+            state: Hedge.SUCCESS
+        },
+    });
+
+    const res = {
+        total,
+        success
+    };
+
+    self.json({code: 200, msg: 'success', data: res});
+}
+
+async function get_dashboard_hedge_profit_chart() {
+    const self = this;
+    const result = await Hedge.findAll({
+        limit: 100,
+        order: [
+            ['id', 'DESC']
+        ]
+    });
+
+    const labels = [];
+    const longSets = [];
+
+    for(const hedge of result){
+        labels.unshift(hedge.id);
+        const long = (((new Date(hedge.ftime)) - (new Date(hedge.stime)))/1000).toFixed(0);
+        longSets.unshift(long > 0 ? long : 0);
+    }
+
+    const res = {
+        labels,
+        longSets
+    };
+
+    self.json({code: 200, msg: 'success', data: res});
 }
 
 async function get_setting_detail() {

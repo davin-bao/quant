@@ -57,9 +57,10 @@ class CreateOrder {
 
             await orderBuy.save({transaction: t});
             await orderSell.save({transaction: t});
-            await orderBuy.trade();
-            await orderSell.trade();
         });
+
+        await orderBuy.trade();
+        await orderSell.trade();
     }
 }
 

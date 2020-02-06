@@ -46,8 +46,8 @@ const handle = async () => {
 
 const querySchedule = () => {
     const cacheKey = 'TASK|HEDGE_QUERY';
-    //每60s定时执行一次:
-    schedule.scheduleJob('0 * * * * *', () => {
+    //每10s定时执行一次:
+    schedule.scheduleJob('*/10 * * * * *', () => {
         if (!F.cache.get(cacheKey)) {
             F.cache.set2(cacheKey, true, '1 hour');
 

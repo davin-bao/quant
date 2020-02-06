@@ -23,9 +23,9 @@ Setting.init({
 
 Setting.instance = function(){
     return Setting.findOne({
-        where: {
-            enabled: true
-        }
+        // where: {
+            // enabled: true
+        // }
     });
 };
 

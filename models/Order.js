@@ -42,7 +42,7 @@ class Order extends Model {
 
         if(orderResult instanceof Error){
             if(orderResult.code === Error.ACCOUNT_NOT_ENOUGH){
-                const setting = Setting.instance();
+                const setting = await Setting.instance();
                 setting.update({
                     enabled: false
                 });

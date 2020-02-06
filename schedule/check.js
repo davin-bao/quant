@@ -5,8 +5,13 @@ const Setting = require('../models/Setting');
 require('total.js');
 
 const handle = async () => {
-    const setting  = await Setting.instance();
     Log.Info(__filename, 'checking ...');
+    const setting  = await  Setting.findOne({
+        where: {
+            enabled: true
+        }
+    });
+    if(!setting) return;
 
     const strategy = new Strategy(setting);
     await strategy.safety();

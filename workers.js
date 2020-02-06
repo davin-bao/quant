@@ -4,6 +4,7 @@ const tradeSchedule = require('./schedule/trade');
 const querySchedule = require('./schedule/query');
 const cancelSchedule = require('./schedule/cancel');
 const hedgeQuerySchedule = require('./schedule/hedgeQuery');
+const accountStatisticsSchedule = require('./schedule/accountStatistics');
 
 dotenv.config('./env');
 
@@ -13,3 +14,4 @@ querySchedule();
 cancelSchedule();
 
 hedgeQuerySchedule();
+accountStatisticsSchedule();
