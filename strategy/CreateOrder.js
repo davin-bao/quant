@@ -1,15 +1,18 @@
+const Decimal = require('decimal');
 const sequelize = require('../definitions/sequelize');
 const Hedge = require('../models/Hedge');
 const Order = require('../models/Order');
 
 class CreateOrder {
-    constructor(market, marketplaceBuy, marketplaceSell, priceBuy, priceSell, volume){
-        this.market = market;
-        this.marketplaceBuy = marketplaceBuy;
-        this.marketplaceSell = marketplaceSell;
-        this.volume = volume;
-        this.priceBuy = priceBuy;
-        this.priceSell = priceSell;
+    constructor(options = {}){
+        this.market = options.market;
+        this.marketplaceBuy = options.marketplaceBuy;
+        this.marketplaceSell = options.marketplaceSell;
+        this.volume = options.volume;
+        this.priceBuy = options.priceBuy;
+        this.priceSell = options.priceSell;
+        this.priceBuyFee = options.priceBuyFee;
+        this.priceSellFee = options.priceSellFee;
     }
 
     async createHedge() {
@@ -19,14 +22,16 @@ class CreateOrder {
 
         await sequelize.transaction(async t=>{
             hedge = new Hedge({
-                state: 'wait',
+                state: Hedge.WAITING,
                 market: this.market,
                 marketplace_buy: this.marketplaceBuy,
                 marketplace_sell: this.marketplaceSell,
                 price_buy: this.priceBuy,
                 price_sell: this.priceSell,
                 volume: this.volume,
-                profit: (this.priceSell - this.priceBuy) * this.volume
+                profit: Decimal(this.priceSell).sub(this.priceBuy).sub(this.priceSellFee).sub(this.priceBuyFee).mul(this.volume).toNumber(),
+                fee: Decimal(this.priceSellFee).add(this.priceBuyFee).toNumber(),
+                stime: new Date().getTime()
             });
             hedge = await hedge.save({transaction: t});
 
@@ -52,6 +57,8 @@ class CreateOrder {
 
             await orderBuy.save({transaction: t});
             await orderSell.save({transaction: t});
+            await orderBuy.trade();
+            await orderSell.trade();
         });
     }
 }

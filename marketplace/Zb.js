@@ -8,7 +8,6 @@ const Market = require('./response/Market');
 const Depth = require('./response/Depth');
 const Account = require('./response/Account');
 const Order = require('./response/Order');
-const OrderModel = require('../models/Order');
 
 class Zb extends Marketplace {
 
@@ -100,7 +99,22 @@ class Zb extends Marketplace {
             if(res.code && parseInt(res.code) === 1000){
                 return new Order(res.id || -1, true, res.message);
             }else{
-                return new Error(res.message, parseInt(res.code) || 1001);
+                let code = 1001;
+                switch (parseInt(res.code) || 1001) {
+                    case 2001:
+                    case 2002:
+                    case 2003:
+                    case 2004:
+                    case 2005:
+                    case 2006:
+                    case 2007:
+                    case 2008:
+                    case 2009:
+                        code = 2000;  //交易余额不足
+                    default:
+                        code = 1001;
+                }
+                return this.Error(res);
             }
         }catch(e){
             return new Error(e);
@@ -123,9 +137,9 @@ class Zb extends Marketplace {
         try{
             const res = JSON.parse(await request(url));
             if(res.code && parseInt(res.code) === 1000) {
-                return new Order(res.order_id || orderId, parseInt(res.code) === 1000, res.message || '', OrderModel.CANCEL);
+                return new Order(res.order_id || orderId, parseInt(res.code) === 1000, res.message || '', Order.CANCEL);
             }else{
-                return new Error(res.message, parseInt(res.code) || 1001);
+                return this.Error(res);
             }
         }catch(e){
             return new Error(e);
@@ -149,31 +163,31 @@ class Zb extends Marketplace {
             const res = JSON.parse(await request(url));
 
             if(res.id){
-                let state = OrderModel.TRADING;
+                let state = Order.TRADING;
                 switch (parseInt(res.state|| res.status)) {
                     case 0:
                     case 3:
                     default:
-                        state = OrderModel.TRADING;
+                        state = Order.TRADING;
                         break;
                     case 1:
-                        state = OrderModel.CANCEL;
+                        state = Order.CANCEL;
                         break;
                     case 2:
-                        state = OrderModel.FINISHED;
+                        state = Order.FINISHED;
                         break;
                 }
                 return new Order(
                     res.id,
                     true,
-                    'success',
+                    'state:' + state,
                     state,
                     Decimal(res.trade_money || 0).div(res.trade_amount || 0).toNumber(),   //均价
                     res.trade_amount || 0,
                     res.price || 0
                 );
             }else{
-                return new Error(res.message, parseInt(res.code) || 1001);
+                return this.Error(res);
             }
         }catch(e){
             return new Error(e);
@@ -184,8 +198,35 @@ class Zb extends Marketplace {
         return parseFloat(amount) * 0.2 / 100;
     }
 
-    static getDebugDepth(){
-        return JSON.parse('{"asks":[[3.9142,0.03],[3.914,30.19]],"bids":[[3.9131,132.08],[3.9125,92.67]],"timestamp":1579245474}');
+    Error(e){
+
+        const message = e.message || e || '通信失败';
+        let code = Error.ERROR;
+        switch (parseInt(e.code) || 1001) {
+            case 2001:
+            case 2002:
+            case 2003:
+            case 2004:
+            case 2005:
+            case 2006:
+            case 2007:
+            case 2008:
+            case 2009:
+                code = Error.ACCOUNT_NOT_ENOUGH;    // 交易账户余额不足
+                break;
+            case 3001:
+                code = Error.ORDER_FINISHED_WHEN_CANCEL;    // 订单已完成交易（撤单时完成交易的订单不能撤单）
+                break;
+            case 1001:
+            default:
+                if(message === 'Error order id'){
+                    code = Error.ERROR_ORDER_ID;    // 订单不存在(重复撤单，订单号不对等)
+                }else{
+                    code = Error.ERROR;
+                }
+                break;
+        }
+        return new Error(message, code);
     }
 }
 

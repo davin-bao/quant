@@ -13,7 +13,7 @@ Hedge.init({
     price_sell: Sequelize.DECIMAL,
     volume: Sequelize.DECIMAL,
     profit: Sequelize.DECIMAL,
-    result: Sequelize.STRING,
+    fee: Sequelize.DECIMAL,
     stime: Sequelize.DATE,
     ftime: Sequelize.DATE,
 }, {
@@ -21,5 +21,9 @@ Hedge.init({
     tableName: 'hedge',
     timestamps: false,
 });
+
+Hedge.WAITING = 'waiting';      // 等待发起交易
+Hedge.FAILED = 'failed';        // 交易失败
+Hedge.SUCCESS = 'success';    // 交易完成
 
 exports = module.exports = Hedge;

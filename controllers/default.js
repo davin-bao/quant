@@ -114,15 +114,21 @@ function get_hedge_index() {
 
 async function post_hedge_index() {
     const self = this;
-    const result = await Hedge.findAll({
-        limit: 200,
-        offset: 0,
-        order: [
-            ['id', 'DESC']
-        ]
+
+    const { total } = await Hedge.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']]
     });
 
-    self.json({code: 200, msg: 'success', data: result});
+    const sort = getSort(self.body);
+
+    const result = await Hedge.findAll({
+        limit: self.body.length,
+        offset: self.body.start,
+        order: sort
+    });
+
+    self.json({code: 200, msg: 'success', total, data: result});
 }
 
 async function post_order_index() {
@@ -166,6 +172,16 @@ function get_account_index() {
     self.view('account_index');
 }
 
+function getSort(body) {
+    const sort = [];
+    for(let i=0; i<6; i++){
+        if(body['order['+i+'][column]']) {
+            sort.push([body['order['+i+'][column]'], body['order['+i+'][dir]']]);
+        }
+    }
+    return sort;
+}
+
 async function post_account_index() {
     const self = this;
 
@@ -174,12 +190,7 @@ async function post_account_index() {
         attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']]
     });
 
-    const sort = [];
-    for(let i=0; i<6; i++){
-        if(self.body['order['+i+'][column]']) {
-            sort.push([self.body['order['+i+'][column]'], self.body['order['+i+'][dir]']]);
-        }
-    }
+    const sort = getSort(self.body);
 
     const result = await Account.findAll({
         limit: self.body.length,

@@ -52,7 +52,7 @@ class Log {
     static write(message) {
         const dt = dateTime.create();
         const pwd = process.cwd();
-        fs.appendFileSync(pwd+'/tmp/' + dt.format('y-m-d') + '.log', message+"\n");
+        fs.appendFileSync(pwd+'/logs/' + dt.format('y-m-d') + '.log', message+"\n");
     }
 }
 

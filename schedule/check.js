@@ -1,6 +1,5 @@
-const { loop } = require('../definitions/utils');
-const Log = require('../definitions/Log');
 const schedule = require('node-schedule');
+const Log = require('../definitions/Log');
 const Strategy = require('../strategy/Strategy');
 const Setting = require('../models/Setting');
 require('total.js');

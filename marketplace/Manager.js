@@ -1,9 +1,10 @@
 const fs = require('fs');
+const market = require('./Marketplace');
 const Zb = require('./Zb');
-const Hbg = require('./Hbg');
 const Okex = require('./Okex');
+// const Hbg = require('./Hbg');
 
-class Manager {
+class MarketplaceManager {
     //构造函数
     static get(place, market) {
         switch (place) {
@@ -11,8 +12,8 @@ class Manager {
                 return new Zb(market);
             case 'okex':
                 return new Okex(market);
-            case 'hbg':
-                return new Hbg(market);
+            // case 'hbg':
+            //     return new Hbg(market);
             default:
                 throw new Error('不支持的交易平台:' + place);
         }
@@ -43,4 +44,4 @@ class Manager {
     }
 }
 
-exports = module.exports = Manager;
+exports = module.exports = MarketplaceManager;

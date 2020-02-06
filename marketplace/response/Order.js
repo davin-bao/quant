@@ -12,4 +12,9 @@ class Order {
     }
 }
 
+Order.WAITING = 'waiting';      // 等待发起交易
+Order.TRADING = 'trading';      // 交易中
+Order.CANCEL = 'cancel';        // 交易取消
+Order.FINISHED = 'finished';    // 交易完成
+
 exports = module.exports = Order;

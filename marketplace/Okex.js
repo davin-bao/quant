@@ -9,7 +9,6 @@ const Market = require('./response/Market');
 const Depth = require('./response/Depth');
 const Account = require('./response/Account');
 const Order = require('./response/Order');
-const OrderModel = require('../models/Order');
 
 const tunnel = require('tunnel');
 
@@ -81,7 +80,7 @@ class Okex extends Marketplace {
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/book', JSON.stringify(res));
             return new Depth(size, res.asks || [], res.bids || [], res.timestamp || '');
         }catch(e){
-            return new Error(e);
+            return this.Error(e);
         }
 
         // const url = process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/'+this.market.replace('_', '-').toUpperCase()+'/book?depth=0.00000001&size=' + size;
@@ -109,7 +108,7 @@ class Okex extends Marketplace {
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/accounts', JSON.stringify(res));
             return new Account(res.id || 0, res.currency || '', res.available || 0, res.hold || 0);
         }catch(e){
-            return new Error(e);
+            return this.Error(e);
         }
     }
 
@@ -140,7 +139,7 @@ class Okex extends Marketplace {
 
             return accounts;
         }catch(e){
-            return new Error(e);
+            return this.Error(e);
         }
     }
 
@@ -159,7 +158,18 @@ class Okex extends Marketplace {
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders', JSON.stringify(res));
             return new Order(res.order_id || -1, res.result || false, res.error_message || '');
         }catch(e){
-            return new Error(e);
+            let code = 1001;
+            switch (parseInt(e.response && e.response.data && e.response.data.code) || 1001) {
+                case 33014:  // OKEX
+                    this.code = 3001;
+                case 33017:  // 交易账户余额不足
+                    this.code = 2000;
+                case 33026:  // OKEX
+                    this.code = 3001;
+                default:
+                    code = 1001;
+            }
+            return this.Error(e);
         }
     }
 
@@ -170,9 +180,9 @@ class Okex extends Marketplace {
         try{
             const res = await this.authClient.spot().postCancelOrder(orderId, params);
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/cancel_orders/' + orderId, JSON.stringify(res));
-            return new Order(res.order_id || -1, res.result || false, res.error_message || '', res.result ? OrderModel.CANCEL:OrderModel.TRADING);
+            return new Order(res.order_id || -1, res.result || false, res.error_message || '', res.result ? Order.CANCEL:Order.TRADING);
         }catch(e){
-            return new Error(e);
+            return this.Error(e);
         }
     }
 
@@ -183,7 +193,7 @@ class Okex extends Marketplace {
         try{
             const res = await this.authClient.spot().getOrder(orderId, params);
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders/' + orderId, JSON.stringify(res));
-            let state = OrderModel.TRADING;
+            let state = Order.TRADING;
 
             switch (parseInt(res.state)) {
                 case 0:
@@ -191,25 +201,46 @@ class Okex extends Marketplace {
                 case 3:
                 case 4:
                 default:
-                    state = OrderModel.TRADING;
+                    state = Order.TRADING;
                     break;
                 case -2:
                 case -1:
-                    state = OrderModel.CANCEL;
+                    state = Order.CANCEL;
                     break;
                 case 2:
-                    state = OrderModel.FINISHED;
+                    state = Order.FINISHED;
                     break;
             }
 
             return new Order(res.order_id, res.result, res.error_message || res.status, state, res.price_avg, res.filled_size, res.price);
         }catch(e){
-            return new Error(e);
+            return this.Error(e);
         }
     }
 
     getFee(amount) {
         return parseFloat(amount) * 0.15 / 100;
+    }
+
+    Error(e){
+        const message = (e.response && e.response.data && e.response.data.message) || e.message || e || '通信失败';
+
+        let code = Error.ERROR;
+        switch (parseInt(e.response && e.response.data && e.response.data.code) || 1001) {
+            case 33014:
+                code = Error.ERROR_ORDER_ID;    // 订单不存在(重复撤单，订单号不对等)
+                break;
+            case 33017:
+                code = Error.ACCOUNT_NOT_ENOUGH;    // 交易账户余额不足
+                break;
+            case 33026:
+                code = Error.ORDER_FINISHED_WHEN_CANCEL;    // 订单已完成交易（撤单时完成交易的订单不能撤单）
+                break;
+            default:
+                code = Error.ERROR;
+                break;
+        }
+        return new Error(message, code);
     }
 }
 

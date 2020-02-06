@@ -64,7 +64,16 @@ class Strategy {
                 if ((bBuyPrice - aSellPrice - aSellFee - bBuyFee) / ((aSellPrice + bBuyPrice) / 2) > safe_ratio) {
                     // 发起交易, A挂买单，B挂卖单
                     // Log.Info(__filename, 'market:'+this.market, '发起交易, A挂买单，'+aSellPrice+'，B挂卖单:'+bBuyPrice, (bBuyPrice - aSellPrice - aSellFee - bBuyFee));
-                    const createOrder = new CreateOrder(this.market, this.marketplaceA, this.marketplaceB, aSellPrice, bBuyPrice, volume);
+                    const createOrder = new CreateOrder({
+                        market: this.market,
+                        marketplaceBuy: this.marketplaceA,
+                        marketplaceSell: this.marketplaceB,
+                        priceBuy: aSellPrice,
+                        priceSell: bBuyPrice,
+                        volume: volume,
+                        priceBuyFee: aSellFee,
+                        priceSellFee: bBuyFee
+                    });
                     await createOrder.createHedge();
                 }
             // }
@@ -89,7 +98,16 @@ class Strategy {
                 if ((aBuyPrice - bSellPrice - aBuyFee - bSellFee) / ((aBuyPrice + bSellPrice) / 2) > safe_ratio) {
                     // 发起交易, A挂卖单，B挂买单
                     // Log.Info(__filename, 'market:'+this.market, '发起交易, A挂卖单:'+aBuyPrice+'，B挂买单:'+bSellPrice, (aBuyPrice - bSellPrice - aBuyFee - bSellFee));
-                    const createOrder = new CreateOrder(this.market, this.marketplaceB, this.marketplaceA, bSellPrice, aBuyPrice, volume);
+                    const createOrder = new CreateOrder({
+                        market: this.market,
+                        marketplaceBuy: this.marketplaceB,
+                        marketplaceSell: this.marketplaceA,
+                        priceBuy: bSellPrice,
+                        priceSell: aBuyPrice,
+                        volume: volume,
+                        priceBuyFee: bSellFee,
+                        priceSellFee: aBuyFee
+                    });
                     await createOrder.createHedge();
                 }
             // }
