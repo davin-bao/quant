@@ -15,9 +15,9 @@ const handle = async () => {
 const accountStatisticsSchedule = () => {
     const cacheKey = 'TASK|ACCOUNT_STATISTICS';
     //每1hour定时执行一次:
-    schedule.scheduleJob('* 0 * * * *', () => {
+    schedule.scheduleJob('0 */5 * * * *', () => {
         if (!F.cache.get(cacheKey)) {
-            F.cache.set2(cacheKey, true, '1 hour');
+            F.cache.set(cacheKey, true, '1 hour');
 
             handle().catch(e => {
                 Log.Error(__filename, e);

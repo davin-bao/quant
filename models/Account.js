@@ -73,6 +73,37 @@ class Account extends Model {
             memo: '存入,关联ID:' + (options.relate_id || 0)
         }, options);
     }
+    //同步
+    async syncSave(upstreamAccounts){
+        const self = this;
+        await sequelize.transaction(async t=> {
+            let upstreamAvailable = 0, upstreamLocked = 0;
+            upstreamAccounts.forEach(upstreamAccount => {
+                if (upstreamAccount.currency.toLowerCase() === self.currency.toLowerCase()) {
+                    upstreamAvailable = upstreamAccount.available;
+                    upstreamLocked = upstreamAccount.locked;
+                }
+            });
+
+            const available_change = Decimal(self.available).sub(upstreamAvailable).toNumber();
+            const locked_change = Decimal(self.locked).sub(upstreamLocked).toNumber();
+
+            const accountLog = new AccountLog({
+                account_id: self.id,
+                available_change: available_change,
+                available: upstreamAvailable,
+                locked_change: locked_change,
+                locked: upstreamLocked,
+                memo: '对账'
+            });
+            self.update({
+                available: upstreamAvailable,
+                locked: upstreamLocked
+            }, {transaction: t});
+
+            accountLog.save({transaction: t});
+        });
+    };
 }
 
 Account.init({
@@ -93,8 +124,8 @@ AccountLog.belongsTo(Account,  {foreignKey: 'account_id', targetKey: 'id'});
 Account.getByMarketplaceAndCurrency = function(marketplace, currency){
     const account = Account.findOne({
         where:{
-            marketplace,
-            currency
+            marketplace: marketplace.toLowerCase(),
+            currency: currency.toLowerCase()
         }
     });
     return account;
@@ -116,35 +147,8 @@ Account.sync = async function() {
     for(let i=0; i<marketplaceKeys.length; i++){
         const mp = MarketplaceManager.get(marketplaceKeys[i], setting.market);
         const upstreamAccounts = await mp.getAccountList();
-
-        await sequelize.transaction(async t=> {
-            marketplaces[marketplaceKeys[i]].forEach(account => {
-                let upstreamAvailable = 0, upstreamLocked = 0;
-                upstreamAccounts.forEach(upstreamAccount => {
-                    if (upstreamAccount.currency.toLowerCase() === account.currency.toLowerCase()) {
-                        upstreamAvailable = upstreamAccount.available;
-                        upstreamLocked = upstreamAccount.locked;
-                    }
-                });
-
-                const available_change = Decimal(account.available).sub(upstreamAvailable).toNumber();
-                const locked_change = Decimal(account.locked).sub(upstreamLocked).toNumber();
-
-                const accountLog = new AccountLog({
-                    account_id: account.id,
-                    available_change: available_change,
-                    available: upstreamAvailable,
-                    locked_change: locked_change,
-                    locked: upstreamLocked,
-                    memo: '对账'
-                });
-                account.update({
-                    available: upstreamAvailable,
-                    locked: upstreamLocked
-                }, {transaction: t});
-
-                accountLog.save({transaction: t});
-            });
+        marketplaces[marketplaceKeys[i]].forEach(account => {
+            account.syncSave(upstreamAccounts);
         });
     }
 };

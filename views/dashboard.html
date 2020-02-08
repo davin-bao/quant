@@ -151,10 +151,11 @@
                                 <h4 class="card-title">账户趋势</h4>
                                 <h5 class="card-subtitle">
                                     <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(0)">净值</button>
-                                    <button class="btn btn-success mr-1" onclick="getAccountStatisticsData(1)" id="account-statistics-currency-1">货币1</button>
-                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(2)" id="account-statistics-currency-2">货币2</button>
-                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(3)" id="account-statistics-currency-3">市场1</button>
-                                    <button class="btn btn-info" onclick="getAccountStatisticsData(4)" id="account-statistics-currency-4">市场2</button>
+                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(1)" id="account-statistics-currency-1">和值</button>
+                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(2)" id="account-statistics-currency-2">货币1</button>
+                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(3)" id="account-statistics-currency-3">货币2</button>
+                                    <button class="btn btn-info mr-1" onclick="getAccountStatisticsData(4)" id="account-statistics-currency-4">市场1</button>
+                                    <button class="btn btn-info" onclick="getAccountStatisticsData(5)" id="account-statistics-currency-5">市场2</button>
                                 </h5>
                             </div>
                         </div>
@@ -192,7 +193,7 @@
                             labels: res.data.labels,
                             datasets: [
                                 {
-                                    label: res.data.currency,
+                                    label: '净值',
                                     fillColor: "rgba(27,205,0,0.2)",
                                     strokeColor: "rgb(130,205,62)",
                                     pointColor: "rgb(27,205,0)",
@@ -202,7 +203,7 @@
                                     data: res.data.amount_a
                                 },
                                 {
-                                    label: res.data.currency,
+                                    label: '和值',
                                     fillColor: "rgba(151,187,205,0.2)",
                                     strokeColor: "rgba(151,187,205,1)",
                                     pointColor: "rgba(151,187,205,1)",
@@ -215,18 +216,18 @@
                         }, {});
                     }else{
                         for(let i=0; i< res.data.labels.length; i++){
-                            accountStatistics.datasets[0].points[i].value = res.data.amount_a[i];
-                            accountStatistics.datasets[1].points[i].value = res.data.amount_b[i];
+                            accountStatistics.datasets[0].points[i] && (accountStatistics.datasets[0].points[i].value = res.data.amount_a[i]);
+                            accountStatistics.datasets[1].points[i] && (accountStatistics.datasets[1].points[i].value = res.data.amount_b[i]);
                         }
                         accountStatistics.datasets[0].label = res.data.currency;
                         accountStatistics.datasets[1].label = res.data.currency;
 
                         accountStatistics.update();
                     }
-                    $('#account-statistics-currency-1').html(res.data.currency_a);
-                    $('#account-statistics-currency-2').html(res.data.currency_b);
-                    $('#account-statistics-currency-3').html(res.data.marketplace_a);
-                    $('#account-statistics-currency-4').html(res.data.marketplace_b);
+                    $('#account-statistics-currency-2').html(res.data.currency_a);
+                    $('#account-statistics-currency-3').html(res.data.currency_b);
+                    $('#account-statistics-currency-4').html(res.data.marketplace_a);
+                    $('#account-statistics-currency-5').html(res.data.marketplace_b);
                 }else{
                     alert('保存失败');
                 }

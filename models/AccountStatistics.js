@@ -1,9 +1,12 @@
 const Sequelize = require('sequelize');
 const Decimal = require('decimal');
 const sequelize = require('../definitions/sequelize');
+const Log = require('../definitions/Log');
 const MarketplaceManager = require('../marketplace/Manager');
 const Model = require('./Model');
 const Setting = require('./Setting');
+const Order = require('./Order');
+const Account = require('./Account');
 
 class AccountStatistics extends Model {
 
@@ -26,6 +29,7 @@ AccountStatistics.init({
 });
 
 AccountStatistics.sync = async function() {
+    const times = 15;
     const settings  = await Setting.findAll();
     for(const setting of settings){
         const marketplaces =[setting.marketplace_a, setting.marketplace_b];
@@ -36,19 +40,50 @@ AccountStatistics.sync = async function() {
             const amounts = [];
 
             const mp = MarketplaceManager.get(marketplace, setting.market);
+            // 获取汇率
+            const depth = await mp.getDepth(1);
+            const sellPrice = parseFloat(depth.getLastAsks()[0]);
+            // 获取账户余额
             const upstreamAccounts = await mp.getAccountList();
-            upstreamAccounts.forEach(upstreamAccount => {
+            for(const currency of currencies){
+                const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
+                await account.syncSave(upstreamAccounts);
+            }
+
+            for(const upstreamAccount of upstreamAccounts) {
                 if (upstreamAccount.currency.toLowerCase() === currencies[0].toLowerCase()) {
                     amounts[0] = Decimal(upstreamAccount.available).add(upstreamAccount.locked).toNumber();
                     currencyAmount.push(amounts[0]);
+                    Log.Info(__filename, marketplace + ' volume:' + setting.volume + '*'+times+' - available:' + upstreamAccount.available + ' = ' +
+                        (parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)));
+
+                    if(parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available) > 0){
+                        // 提交一个平衡账户的订单
+                        await Order.balance({
+                            marketplace,
+                            market: setting.market,
+                            currencies,
+                            side: Order.SIDE_BUY
+                        });
+                    }
                 }
                 if (upstreamAccount.currency.toLowerCase() === currencies[1].toLowerCase()) {
                     amounts[1] = Decimal(upstreamAccount.available).add(upstreamAccount.locked).toNumber();
                     currencyAmount.push(amounts[1]);
+                    Log.Info(__filename, marketplace + ' volume:' + setting.volume + '*'+times+' - (available:' + upstreamAccount.available + ' / sellPrice:'+sellPrice+') = ' +
+                        (parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)/sellPrice));
+
+                    if(parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)/sellPrice > 0){
+                        // 提交一个平衡账户的订单
+                        await Order.balance({
+                            marketplace,
+                            market: setting.market,
+                            currencies,
+                            side: Order.SIDE_SELL
+                        });
+                    }
                 }
-            });
-            const depth = await mp.getDepth(1);
-            const sellPrice = parseFloat(depth.getLastAsks()[0]);
+            }
 
             totalAmount = Decimal(totalAmount).add(Decimal(amounts[0]).mul(sellPrice).add(amounts[1]).toNumber()).toNumber().toFixed(6);
         }

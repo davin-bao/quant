@@ -144,14 +144,31 @@ class Okex extends Marketplace {
     }
 
     async orders(side, price, volume, orderId) {
+        // order_type:
+        // 0：普通委托（order type不填或填0都是普通委托）
+        // 1：只做Maker（Post only）
+        // 2：全部成交或立即取消（FOK）
+        // 3：立即成交并取消剩余（IOC）
         const params = {
             side,
             instrument_id: this.market.toUpperCase(),
-            size: volume,
-            price: price + '',
-            order_type: '2',
-            client_oid: 'OKEX' + orderId
+            client_oid: 'OKEX' + orderId,
+            order_type: '0'
         };
+        if(price < 0){
+            // 市价单
+            params.type = 'market';
+            if(side === 'sell') {
+                params.size = volume;
+            }else{
+                params.notional = volume;
+            }
+        }else{
+            // 限价单
+            params.size = volume;
+            params.type = 'limit';
+            params.price = price + '';
+        }
         let res = {};
         try{
             res = await this.authClient.spot().postOrder(params);

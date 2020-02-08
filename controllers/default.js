@@ -1,5 +1,6 @@
 const Sequelize = require('sequelize');
 const Decimal = require('decimal');
+const { DateFormat } = require('../definitions/utils');
 const sequelize = require('../definitions/sequelize');
 const Hedge = require('../models/Hedge');
 const Order = require('../models/Order');
@@ -89,10 +90,15 @@ async function get_dashboard_account_statistics_chart() {
     const marketplace_a = 'zb';
     const marketplace_b = 'okex';
 
+    const timeLimit = (new Date().getTime()) - 3600 * 24 * 1000;
+
     const accountStatistics = await AccountStatistics.findAll({
         where: {
             marketplace_a,
-            marketplace_b
+            marketplace_b,
+            ctime: {
+                [Op.gte]: timeLimit
+            }
         },
         limit: 100,
         order: [
@@ -104,6 +110,9 @@ async function get_dashboard_account_statistics_chart() {
     let currency_b = '';
     const labels = [];
     const amount = [];
+    const amount_t = [];
+    const amount_a = [];
+    const amount_b = [];
     const currency_a_a = [];
     const currency_a_b = [];
     const currency_b_a = [];
@@ -113,8 +122,11 @@ async function get_dashboard_account_statistics_chart() {
         if(currency_a === ''){
             [currency_a, currency_b] = accountStatistic.market.trim().toUpperCase().split('_');
         }
-        labels.unshift(accountStatistic.id);
+        labels.unshift(accountStatistic.id); //DateFormat((new Date(accountStatistic.ctime)),'hh:mm:ss'));
         amount.unshift(accountStatistic.amount);
+        amount_t.unshift(Decimal(accountStatistic.currency_a_a).add(accountStatistic.currency_b_b).add(accountStatistic.currency_a_b).add(accountStatistic.currency_b_a).toNumber());
+        amount_a.unshift(Decimal(accountStatistic.currency_a_a).add(accountStatistic.currency_b_b).toNumber());
+        amount_b.unshift(Decimal(accountStatistic.currency_a_b).add(accountStatistic.currency_b_a).toNumber());
         currency_a_a.unshift(accountStatistic.currency_a_a);
         currency_a_b.unshift(accountStatistic.currency_a_b);
         currency_b_a.unshift(accountStatistic.currency_b_a);
@@ -134,25 +146,29 @@ async function get_dashboard_account_statistics_chart() {
         case 0:
         default:
             res.amount_a = amount;
-            res.amount_b = amount;
+            res.amount_b = amount_t;
             break;
         case 1:
-            res.currency = currency_a;
-            res.amount_a = currency_a_a;
-            res.amount_b = currency_b_a;
+            res.amount_a = amount_a;
+            res.amount_b = amount_b;
             break;
         case 2:
-            res.currency = currency_b;
-            res.amount_a = currency_a_b;
+            res.currency = currency_a;
+            res.amount_a = currency_a_a;
             res.amount_b = currency_b_b;
             break;
         case 3:
+            res.currency = currency_b;
+            res.amount_a = currency_a_b;
+            res.amount_b = currency_b_a;
+            break;
+        case 4:
             res.amount_a = currency_a_a;
             res.amount_b = currency_a_b;
             break;
-        case 4:
-            res.amount_a = currency_b_a;
-            res.amount_b = currency_b_b;
+        case 5:
+            res.amount_a = currency_b_b;
+            res.amount_b = currency_b_a;
             break;
     }
 
@@ -185,6 +201,9 @@ async function get_dashboard_hedge_success_chart() {
 async function get_dashboard_hedge_profit_chart() {
     const self = this;
     const result = await Hedge.findAll({
+        where: {
+            state: Hedge.SUCCESS
+        },
         limit: 100,
         order: [
             ['id', 'DESC']

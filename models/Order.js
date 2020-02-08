@@ -9,6 +9,8 @@ const MarketplaceManager = require('../marketplace/Manager');
 const Account = require('../models/Account');
 const Error = require('../marketplace/response/Error');
 
+const Op = Sequelize.Op;
+
 class Order extends Model {
     // 发起交易
     async trade() {
@@ -42,13 +44,23 @@ class Order extends Model {
 
         if(orderResult instanceof Error){
             if(orderResult.code === Error.ACCOUNT_NOT_ENOUGH){
-                const setting = await Setting.instance();
-                setting.update({
-                    enabled: false
-                });
-
                 // 账户余额不足，关闭交易
-                return;
+                // const cacheKey = 'LOCK|BALANCE|' + self.market + '|' + self.marketplace;
+                // if (!F.cache.get(cacheKey)) {
+                //     F.cache.set(cacheKey, true, '10 minutes');
+                    try{
+                        // 账户余额不足，关闭交易
+                        const setting = await Setting.instance();
+                        setting.update({
+                            enabled: false
+                        });
+                        return;
+                    }catch (e) {
+                        throw e;
+                    }finally {
+                        // F.cache.remove(cacheKey);
+                    }
+                // }
             }
             orderResult = {order_id: -1, result: false, error_message: orderResult.message};
         }
@@ -72,6 +84,9 @@ class Order extends Model {
     async query() {
         const self = this;
         const marketplace = self.marketplace;
+        const currencies = self.market.split('_').trim();
+        const currency = self.side === 'buy' ? currencies[1] : currencies[0];
+        const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
 
         // 发起交易查询
         const mp = MarketplaceManager.get(marketplace, self.market);
@@ -84,7 +99,7 @@ class Order extends Model {
         const memo = orderResult.error_message;
         Log.Info(__filename, '查询交易 no：' + self.id + ',' + memo);
         await sequelize.transaction(async t=> {
-            self.update({
+            await self.update({
                 state: orderResult.state,
                 avg_price: orderResult.avg_price || 0,
                 executed_volume: orderResult.executed_volume || 0,
@@ -92,8 +107,9 @@ class Order extends Model {
                 memo
             }, {transaction: t});
 
-            if(orderResult.state === Order.FINISHED){
-                const currencies = self.market.split('_').trim();
+            if (orderResult.state === Order.CANCEL) {
+                await account.unlock(self.volume, {transaction: t, relate_id: self.id});
+            }else if(orderResult.state === Order.FINISHED){
                 const currencyAdd = self.side === 'buy' ? currencies[0] : currencies[1];
                 const currencySub = self.side === 'buy' ? currencies[1] : currencies[0];
 
@@ -123,10 +139,10 @@ class Order extends Model {
             }else if(orderResult.code === Error.ERROR_ORDER_ID){ // 订单号不存在
                 orderResult = {order_id: -1, state: Order.CANCEL, error_message: orderResult.message};
             }else{
-                orderResult = {order_id: -1, state: Order.TRADING, error_message: orderResult.message};
+                orderResult = {order_id: -1, state: Order.TRADING, error_message: '交易超时'};
             }
         }
-        const memo = orderResult.error_message;
+        const memo = orderResult.error_message === '操作成功' ? '交易超时' : orderResult.error_message;
         Log.Info(__filename, '取消交易 no：' + self.id + ',' + memo);
         await sequelize.transaction(async t=> {
             self.update({
@@ -142,6 +158,44 @@ class Order extends Model {
                 const currency = self.side === 'buy' ? currencies[1] : currencies[0];
                 const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
                 await account.unlock(self.volume, {transaction: t, relate_id: self.id});
+            }
+        });
+    }
+    //发起平衡账户交易
+    async tradeBalance() {
+        const self = this;
+
+        if(parseInt(self.order_id) !== -1) return;
+
+        const marketplace = self.marketplace;
+        const currencies = self.market.split('_').trim();
+        const currency = self.side === 'buy' ? currencies[1] : currencies[0];
+        const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
+        const mp = MarketplaceManager.get(marketplace, self.market);
+
+        let orderResult = await mp.orders(self.side, -1, self.volume, self.id);
+
+        if(orderResult instanceof Error){
+            if(orderResult.code === Error.ACCOUNT_NOT_ENOUGH){
+                // 账户余额不足，关闭交易
+                Log.Info(__filename, '账户余额不足，关闭交易');
+                return;
+            }
+            orderResult = {order_id: -1, result: false, error_message: orderResult.message};
+        }
+        const memo = orderResult.error_message;
+        Log.Info(__filename, '发起平衡账户交易 no：' + self.id + ',结果: ' + orderResult.result + ',' + memo);
+        await sequelize.transaction(async t=> {
+            self.update({
+                order_id: orderResult.order_id,
+                state: orderResult.result ? Order.TRADING : Order.CANCEL,
+                ttime: new Date().getTime(),
+                memo
+            });
+
+            if (orderResult.state === Order.TRADING) {
+                // 锁定
+                await account.lock(self.volume, {transaction: t, relate_id: self.id});
             }
         });
     }
@@ -173,7 +227,64 @@ Order.TRADING = 'trading';      // 交易中
 Order.CANCEL = 'cancel';        // 交易取消
 Order.FINISHED = 'finished';    // 交易完成
 
+Order.SIDE_BUY = 'buy';
+Order.SIDE_SELL = 'sell';
+
 
 Hedge.hasMany(Order, {foreignKey: 'hedge_id', targetKey: 'id'});
+
+Order.balance = async function(options = {}){
+    // 1. 查询账户余额
+    // 2. 查询是否已经创建了交易,条件：
+    // 时间是否在 2分钟内存在 hedge_id == -1 AND marketplace == options.marketplace AND market == options.market AND side = side
+    // TODO
+    // 3. 发起交易
+    // 4. 创建市价订单
+    const currency = options.side === 'buy' ? options.currencies[1] : options.currencies[0];
+
+    const mp = MarketplaceManager.get(options.marketplace, options.market);
+    const upstreamAccounts = await mp.getAccountList();
+    let order = null;
+    let volume = 0;  // 卖出数量 / 买入金额
+    upstreamAccounts.forEach(upstreamAccount => {
+        if (upstreamAccount.currency.toLowerCase() === currency.toLowerCase()) {
+            volume = Decimal(upstreamAccount.available).div(2).toNumber();
+        }
+    });
+    await sequelize.transaction(
+        // { isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.SERIALIZABLE },
+        async t=> {
+        const balanceOrders  = await Order.findAll({
+            transaction: t,
+            where: {
+                hedge_id: -1,
+                marketplace: options.marketplace,
+                market: options.market,
+                side: options.side,
+                state: {
+                    [Op.or]: [Order.WAITING, Order.TRADING, Order.CANCEL]
+                }
+            }
+        });
+        if(balanceOrders.length > 0){
+            Log.Info(__filename, '存在未完成的平衡账户交易，撤销当前请求');
+            return;
+        }
+
+        order = new Order({
+            hedge_id: -1,
+            order_id: '-1',
+            marketplace: options.marketplace,
+            market: options.market,
+            side: options.side,
+            volume, /// 卖出数量 | 买入金额
+            price: -1,
+            state: Order.WAITING
+        });
+        order = await order.save({transaction: t});
+    });
+
+    order && await order.tradeBalance();
+};
 
 exports = module.exports = Order;

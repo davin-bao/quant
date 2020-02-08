@@ -80,6 +80,12 @@ class Zb extends Marketplace {
     async orders(side, price, volume, orderId) {
         const nonce = new Date().getTime();
 
+        if(price < 0){
+            const depth = await this.getDepth(1);
+            price = (side === 'buy') ? parseFloat(depth.getLastAsks()[0]) : parseFloat(depth.getLastBids()[0]);
+            volume = (side === 'buy') ? Decimal(volume).div(price).toNumber() : volume;
+        }
+
         const params = [
             'accesskey='+process.env.ZB_ACCESS_KEY,
             'method=order',
@@ -99,21 +105,6 @@ class Zb extends Marketplace {
             if(res.code && parseInt(res.code) === 1000){
                 return new Order(res.id || -1, true, res.message);
             }else{
-                let code = 1001;
-                switch (parseInt(res.code) || 1001) {
-                    case 2001:
-                    case 2002:
-                    case 2003:
-                    case 2004:
-                    case 2005:
-                    case 2006:
-                    case 2007:
-                    case 2008:
-                    case 2009:
-                        code = 2000;  //交易余额不足
-                    default:
-                        code = 1001;
-                }
                 return this.Error(res);
             }
         }catch(e){

@@ -14,19 +14,20 @@ const handle = async () => {
     const tradeTimeout = parseInt(setting.trade_timeout || 30);
     //获取所有等待交易的订单
     const timeLimit = (new Date().getTime()) - tradeTimeout * 1000;
-    const orders = await Order.findAll({
-        where: {
-            state: Order.WAITING,
-            ctime: {
-                [Op.gte]: timeLimit
-            }
-        }
-    });
-    for (const order of orders) {
-        if(!order) return;
-
-        await order.trade();
-    }
+    // check.js 中已经进行了交易请求
+    // const orders = await Order.findAll({
+    //     where: {
+    //         state: Order.WAITING,
+    //         ctime: {
+    //             [Op.gte]: timeLimit
+    //         }
+    //     }
+    // });
+    // for (const order of orders) {
+    //     if(!order) return;
+    //
+    //     await order.trade();
+    // }
 };
 
 const tradeSchedule = () => {
