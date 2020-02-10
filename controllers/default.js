@@ -20,7 +20,7 @@ exports.install = function() {
     ROUTE('GET /logout', get_logout,   ['authorize']);
 
     ROUTE('GET /dashboard',        get_dashboard, ['authorize', '@admin']);
-    ROUTE('GET /dashboard/{setting}',        get_dashboard, ['authorize', '@admin']);
+    ROUTE('GET /dashboard/{setting_id}',        get_dashboard, ['authorize', '@admin']);
     ROUTE('GET /dashboard-account-statistics-chart', get_dashboard_account_statistics_chart, ['authorize', '@admin']);
     ROUTE('GET /dashboard-hedge-profit-chart', get_dashboard_hedge_profit_chart, ['authorize', '@admin']);
     ROUTE('GET /dashboard-hedge-life-chart', get_dashboard_hedge_life_chart, ['authorize', '@admin']);
@@ -55,10 +55,41 @@ function get_index() {
     }
 }
 
-function get_dashboard(setting) {
+async function get_dashboard(setting_id) {
     const self = this;
+    const setting = await Setting.findOne({
+        where: {
+            id: (setting_id || -1)
+        }
+    });
+    let result = [];
 
-    self.view('dashboard', { setting });
+    let where = {};
+
+    if(setting){
+        where = {
+            market: setting.market
+        };
+    }
+    const { profit } = await Hedge.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('SUM', Sequelize.col('profit')), 'profit']],
+        where: {
+            state: Hedge.SUCCESS,
+            ...where,
+        },
+    });
+
+    const { fee } = await Hedge.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('SUM', Sequelize.col('fee')), 'fee']],
+        where: {
+            state: Hedge.FAILED,
+            ...where,
+        },
+    });
+
+    self.view('dashboard', { setting, profit: Decimal(profit).toNumber().toFixed(6), fee: Decimal(fee).toNumber().toFixed(6) });
 }
 
 function get_login() {

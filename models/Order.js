@@ -49,6 +49,7 @@ class Order extends Model {
                 // if (!F.cache.get(cacheKey)) {
                 //     F.cache.set(cacheKey, true, '10 minutes');
                     try{
+
                         // 账户余额不足，关闭交易
                         const setting = await Setting.findOne({
                             where:{
@@ -62,9 +63,18 @@ class Order extends Model {
                                 ]
                             }
                         });
-                        setting && setting.update({
-                            enabled: false
-                        });
+                        let updated = {};
+                        if(setting.marketplace_a === self.marketplace){
+                            updated = {
+                                side_a: self.side === Order.SIDE_BUY ? Setting.SIDE_BUY_FORBIDDEN : Setting.SIDE_SELL_FORBIDDEN
+                            };
+                        }
+                        if(setting.marketplace_b === self.marketplace){
+                            updated = {
+                                side_b: self.side === Order.SIDE_BUY ? Setting.SIDE_BUY_FORBIDDEN : Setting.SIDE_SELL_FORBIDDEN
+                            };
+                        }
+                        setting && setting.update(updated);
                         return;
                     }catch (e) {
                         throw e;
@@ -80,7 +90,7 @@ class Order extends Model {
         await sequelize.transaction(async t=> {
             self.update({
                 order_id: orderResult.order_id,
-                state: orderResult.result ? Order.TRADING : Order.CANCEL,
+                state: orderResult.state,
                 ttime: new Date().getTime(),
                 memo
             });

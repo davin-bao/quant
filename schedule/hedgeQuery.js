@@ -32,7 +32,7 @@ const handle = async () => {
             if (order.state === Order.CANCEL) {
                 state = Hedge.FAILED;
                 break;
-            } else if (order.state === Order.WAITING || order.state === Order.TRADING) {
+            } else if (order.state === Order.WAITING || order.state === Order.TRADING || order.state === Order.NEED_TRADE) {
                 state = Hedge.WAITING;
             }
         }

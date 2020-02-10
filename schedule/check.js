@@ -15,7 +15,7 @@ const handle = async () => {
     for(const setting of settings){
         Log.Info(__filename, 'Checking ' + setting.market.toUpperCase() + ' ...');
         const strategy = new Strategy(setting);
-        await strategy.danger();
+        await strategy.safety();
     }
 };
 

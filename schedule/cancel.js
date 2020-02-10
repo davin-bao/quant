@@ -21,14 +21,16 @@ const handle = async () => {
         const waitingOrders = await Order.findAll({
             where: {
                 market: setting.market,
-                state: Order.WAITING,
+                state: {
+                    [Op.or]: [Order.WAITING, Order.NEED_TRADE]
+                },
                 ctime: {
                     [Op.lt]: timeLimit
                 }
             }
         });
         for (const order of waitingOrders) {
-            if (order.state === Order.WAITING) {
+            if (order.state === Order.WAITING || order.state === Order.NEED_TRADE) {
                 order.update({
                     order_id: -1,
                     state: Order.CANCEL,
