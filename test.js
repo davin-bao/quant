@@ -4,7 +4,9 @@
 // https://www.totaljs.com
 // ===================================================
 
-const options = {};
+const options = {
+    port: process.env.PORT || 5000
+};
 
 // options.ip = '127.0.0.1';
 // options.port = parseInt(process.argv[2]);
