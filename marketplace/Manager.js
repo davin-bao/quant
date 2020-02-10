@@ -4,7 +4,7 @@ const Zb = require('./Zb');
 const Okex = require('./Okex');
 // const Hbg = require('./Hbg');
 
-class MarketplaceManager {
+class Manager {
     //构造函数
     static get(place, market) {
         switch (place) {
@@ -20,7 +20,7 @@ class MarketplaceManager {
     }
 
     static async getAllSame(marketplaceA, marketplaceB){
-        const cachePath = './cache/markets_' + marketplaceA + '_' + marketplaceB + '.cache';
+        const cachePath = './logs/markets_' + marketplaceA + '_' + marketplaceB + '.cache';
         if (fs.existsSync(cachePath)) {
             return JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
         }
@@ -44,4 +44,4 @@ class MarketplaceManager {
     }
 }
 
-exports = module.exports = MarketplaceManager;
+exports = module.exports = Manager;

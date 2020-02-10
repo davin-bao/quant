@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const Decimal = require('decimal');
+const Decimal = require('../definitions/decimal');
 const sequelize = require('../definitions/sequelize');
 const MarketplaceManager = require('../marketplace/Manager');
 const Model = require('./Model');
@@ -132,24 +132,25 @@ Account.getByMarketplaceAndCurrency = function(marketplace, currency){
 };
 
 Account.sync = async function() {
-    const setting  = await Setting.instance();
+    const settings  = await Setting.findAll();
     const accounts = await Account.findAll();
-
-    const marketplaces =[];
-    accounts.forEach(account => {
-        if(!marketplaces[account.marketplace]){
-            marketplaces[account.marketplace] = [];
+    for(const setting of settings){
+        const marketplaces =[];
+        for(const account of accounts){
+            if(!marketplaces[account.marketplace]){
+                marketplaces[account.marketplace] = [];
+            }
+            marketplaces[account.marketplace].push(account);
         }
-        marketplaces[account.marketplace].push(account);
-    });
 
-    const marketplaceKeys = Object.keys(marketplaces);
-    for(let i=0; i<marketplaceKeys.length; i++){
-        const mp = MarketplaceManager.get(marketplaceKeys[i], setting.market);
-        const upstreamAccounts = await mp.getAccountList();
-        marketplaces[marketplaceKeys[i]].forEach(account => {
-            account.syncSave(upstreamAccounts);
-        });
+        const marketplaceKeys = Object.keys(marketplaces);
+        for(let i=0; i<marketplaceKeys.length; i++){
+            const mp = MarketplaceManager.get(marketplaceKeys[i], setting.market);
+            const upstreamAccounts = await mp.getAccountList();
+            marketplaces[marketplaceKeys[i]].forEach(account => {
+                account.syncSave(upstreamAccounts);
+            });
+        }
     }
 };
 

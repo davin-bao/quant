@@ -1,0 +1,140 @@
+@{title('交易配置')}
+
+@{head("../../assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.css")}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+	<li class="breadcrumb-item"><a href="#">Home</a></li>
+	<li class="breadcrumb-item active" aria-current="page">交易配置</li>
+</ol>
+@{end}
+<div class="card">
+	<div class="card-header">
+		<div class="row justify-content-end">
+			<a class="btn btn-info" href="/setting">新增</a>
+		</div>
+	</div>
+	<div class="card-body">
+		<div class="table-responsive">
+			<table id="setting_table" class="table table-striped table-bordered">
+			</table>
+		</div>
+	</div>
+</div>
+<div class="modal fade" id="delete-confirm-modal" tabindex="-1" role="dialog" aria-labelledby="orderModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-xl" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="orderModalLabel">确认</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				确认删除该设置？
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-primary" data-dismiss="modal" id="btn-del" onclick="onDelete()">OK</button>
+				<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script src="../../assets/extra-libs/DataTables/datatables.min.js"></script>
+<script type="application/javascript">
+	let mainTable = null;
+	$(function () {
+		mainTable = $('#setting_table').DataTable({
+			"searching": false,
+			// 是否允许排序
+			"ordering": true,
+			"order": [[1,'desc']],
+			"info": true,
+			// 是否允许翻页，设成false，翻页按钮不显示
+			"paging": true,
+			"lengthChange": false,
+			"pageLength": 50,
+			"pagingType": "numbers",
+			"autoWidth": true,
+			// 是否表示 "processing" 加载中的信息，这个信息可以修改
+			"processing": true,
+			// 每次创建是否销毁以前的DataTable,默认false
+			"destroy": false,
+			"serverSide": true,
+			"ajax": {
+				// url可以直接指定远程的json文件，或是MVC的请求地址 /Controller/Action
+				url: "/settings",
+				type: 'POST',
+				// 传给服务器的数据，可以添加我们自己的查询参数
+				data: function (param) {
+					param.order.forEach(item=>{
+						item.column = param.columns[item.column].data;
+					});
+					delete param.columns;
+
+					return param;
+				},
+				dataFilter: function(data){
+					var json = jQuery.parseJSON( data );
+					json.recordsTotal = json.total;
+					json.recordsFiltered = json.total;
+					// json.data = json.data;
+					return JSON.stringify( json ); // return JSON string
+				}
+			},
+			dataSrc: function (myJson) {
+				return myJson;
+			},
+			columns: [
+				{ title: 'ID', data: 'id', cellType: 'th' },
+				{ title: '货币对', data: 'market' },
+				{ title: '交易所A', data: 'marketplace_a', orderable: false },
+				{ title: '交易所B', data: 'marketplace_b', orderable: false },
+				{ title: '交易深度', data: 'depth' },
+				{ title: '交易额阈值', data: 'volume_limit' },
+				{ title: '安全系数', data: 'safe_ratio' },
+				{ title: '交易时限(s)', data: 'trade_timeout' },
+				{ title: '行情检测频率', data: 'check_cron' },
+				{ title: '状态', data: 'enabled' },
+				{
+					title: '操作',
+					data: null,
+					orderable: false,
+					render: function(data, type, row, meta) {
+						if (type === 'display') {
+							return '<a class="btn btn-info mr-1" href="/setting/' + row.id + '/">改</a><a class="btn btn-info" href="#" onclick="onDeleteConfirm(' + row.id + ')">删</a>';
+						}
+
+						return data;
+					}
+				}
+			]
+		});
+	});
+	function onDeleteConfirm(id) {
+		$('#btn-del').data('data-id', id);
+		$('#delete-confirm-modal').modal('show');
+	}
+	function onDelete() {
+		const id = $('#btn-del').data('data-id');
+
+		$.ajax({
+			url: "/setting",
+			type: "DELETE",
+			data: { id },
+			dataType: 'json',
+			success: function (res) {
+				if (res.code === 200) {
+					// mainTable.ajax.reload();
+				}
+			},
+			error: function(e){
+				alert(e.statusText);
+			},
+			complete: function(){
+				mainTable.ajax.reload();
+			}
+		});
+	}
+</script>

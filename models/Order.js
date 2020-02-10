@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const Decimal = require('decimal');
+const Decimal = require('../definitions/decimal');
 const sequelize = require('../definitions/sequelize');
 const Model = require('./Model');
 const Hedge = require('./Hedge');
@@ -20,24 +20,24 @@ class Order extends Model {
         const currency = self.side === 'buy' ? currencies[1] : currencies[0];
         const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
 
-        if(!account) {
-            const memo = '账户 ' + marketplace +  '/' + currency + ' 不存在, 终止交易';
-            Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
-            self.update({
-                state: Order.CANCEL,
-                memo
-            });
-            return;
-        }
-        if(Decimal(account.available).sub(self.volume).toNumber() < 0){
-            const memo = '账户 ' + marketplace +  '/' + currency + ' 余额不足, 终止交易';
-            Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
-            self.update({
-                state: Order.CANCEL,
-                memo
-            });
-            return;
-        }
+        // if(!account) {
+        //     const memo = '账户 ' + marketplace +  '/' + currency + ' 不存在, 终止交易';
+        //     Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
+        //     self.update({
+        //         state: Order.CANCEL,
+        //         memo
+        //     });
+        //     return;
+        // }
+        // if(Decimal(account.available).sub(self.volume).toNumber() < 0){
+        //     const memo = '账户 ' + marketplace +  '/' + currency + ' 余额不足, 终止交易';
+        //     Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
+        //     self.update({
+        //         state: Order.CANCEL,
+        //         memo
+        //     });
+        //     return;
+        // }
         // 发起交易请求
         const mp = MarketplaceManager.get(marketplace, self.market);
         let orderResult = await mp.orders(self.side, self.price, self.volume, self.id);
@@ -50,8 +50,19 @@ class Order extends Model {
                 //     F.cache.set(cacheKey, true, '10 minutes');
                     try{
                         // 账户余额不足，关闭交易
-                        const setting = await Setting.instance();
-                        setting.update({
+                        const setting = await Setting.findOne({
+                            where:{
+                                market: self.market,
+                                [Op.or]: [
+                                    {
+                                        marketplace_a: marketplace
+                                    }, {
+                                        marketplace_b: marketplace
+                                    }
+                                ]
+                            }
+                        });
+                        setting && setting.update({
                             enabled: false
                         });
                         return;
@@ -224,6 +235,7 @@ Order.init({
 
 Order.WAITING = 'waiting';      // 等待发起交易
 Order.TRADING = 'trading';      // 交易中
+Order.NEED_TRADE = 'need_trade'; //委托失败，可重试
 Order.CANCEL = 'cancel';        // 交易取消
 Order.FINISHED = 'finished';    // 交易完成
 

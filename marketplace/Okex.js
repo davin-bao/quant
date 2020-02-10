@@ -2,6 +2,7 @@ const Marketplace = require('./Marketplace');
 const request = require('../definitions/request');
 const { PublicClient, AuthenticatedClient } = require('@okfe/okex-node');
 const crypto = require('crypto');
+const Decimal = require('../definitions/decimal');
 
 const Log = require('../definitions/Log');
 const Error = require('./response/Error');
@@ -228,7 +229,7 @@ class Okex extends Marketplace {
     }
 
     getFee(amount) {
-        return parseFloat(amount) * 0.15 / 100;
+        return Decimal(amount).mul(0.15).div(100).toNumber();
     }
 
     Error(e){

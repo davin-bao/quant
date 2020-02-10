@@ -15,3 +15,14 @@ hr { border: 0; border-top: 1px solid #E0E0E0; }
 .linkbutton:hover { color: white; background-color: $color; }
 
 footer { color: white; text-align: center; margin-top: 20px; }
+
+.chart-legend li {
+    display: inline-flex;
+    margin-right: 20px;
+}
+.chart-legend span {
+    display: inline-block;
+    height: 18px;
+    margin-right: 5px;
+    width: 18px;
+}

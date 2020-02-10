@@ -1,4 +1,4 @@
-const Decimal = require('decimal');
+const Decimal = require('../definitions/decimal');
 const sequelize = require('../definitions/sequelize');
 const Hedge = require('../models/Hedge');
 const Order = require('../models/Order');
@@ -29,7 +29,7 @@ class CreateOrder {
                 price_buy: this.priceBuy,
                 price_sell: this.priceSell,
                 volume: this.volume,
-                profit: Decimal(this.priceSell).sub(this.priceBuy).sub(this.priceSellFee).sub(this.priceBuyFee).mul(this.volume).toNumber(),
+                profit: Decimal(this.volume).mul(Decimal(this.priceSell).sub(this.priceBuy).toNumber()).sub(this.priceSellFee).sub(this.priceBuyFee).toNumber(),
                 fee: Decimal(this.priceSellFee).add(this.priceBuyFee).toNumber(),
                 stime: new Date().getTime()
             });

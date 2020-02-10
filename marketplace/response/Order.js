@@ -14,6 +14,7 @@ class Order {
 
 Order.WAITING = 'waiting';      // 等待发起交易
 Order.TRADING = 'trading';      // 交易中
+Order.NEED_TRADE = 'need_trade'; //委托失败，可重试
 Order.CANCEL = 'cancel';        // 交易取消
 Order.FINISHED = 'finished';    // 交易完成
 

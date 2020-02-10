@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const Decimal = require('decimal');
+const Decimal = require('../definitions/decimal');
 const sequelize = require('../definitions/sequelize');
 const Log = require('../definitions/Log');
 const MarketplaceManager = require('../marketplace/Manager');
@@ -29,13 +29,18 @@ AccountStatistics.init({
 });
 
 AccountStatistics.sync = async function() {
-    const times = 15;
-    const settings  = await Setting.findAll();
+    const times = 10;
+    const settings  = await Setting.findAll({
+        enabled: true
+    });
     for(const setting of settings){
         const marketplaces =[setting.marketplace_a, setting.marketplace_b];
         const currencies = setting.market.split('_').trim();
         let totalAmount = 0;
         const currencyAmount = [];
+        let side_a = Setting.SIDE_UN_FORBIDDEN;
+        let side_b = Setting.SIDE_UN_FORBIDDEN;
+
         for(const marketplace of marketplaces) {
             const amounts = [];
 
@@ -54,39 +59,51 @@ AccountStatistics.sync = async function() {
                 if (upstreamAccount.currency.toLowerCase() === currencies[0].toLowerCase()) {
                     amounts[0] = Decimal(upstreamAccount.available).add(upstreamAccount.locked).toNumber();
                     currencyAmount.push(amounts[0]);
+                    const left = Decimal(setting.volume).mul(times).sub(upstreamAccount.available).toNumber();
                     Log.Info(__filename, marketplace + ' volume:' + setting.volume + '*'+times+' - available:' + upstreamAccount.available + ' = ' +
-                        (parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)));
+                        left);
 
-                    if(parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available) > 0){
-                        // 提交一个平衡账户的订单
-                        await Order.balance({
-                            marketplace,
-                            market: setting.market,
-                            currencies,
-                            side: Order.SIDE_BUY
-                        });
+                    if(left > 0){
+                        // 禁止卖方向的交易
+                       if(marketplace === setting.marketplace_a) side_a = Setting.SIDE_SELL_FORBIDDEN;
+                       else side_b = Setting.SIDE_SELL_FORBIDDEN;
+                        // 提交一个买的平衡账户的订单
+                        // await Order.balance({
+                        //     marketplace,
+                        //     market: setting.market,
+                        //     currencies,
+                        //     side: Order.SIDE_BUY
+                        // });
                     }
                 }
                 if (upstreamAccount.currency.toLowerCase() === currencies[1].toLowerCase()) {
                     amounts[1] = Decimal(upstreamAccount.available).add(upstreamAccount.locked).toNumber();
                     currencyAmount.push(amounts[1]);
+                    const left = Decimal(setting.volume).mul(times).sub(Decimal(upstreamAccount.available).div(sellPrice).toNumber()).toNumber();
                     Log.Info(__filename, marketplace + ' volume:' + setting.volume + '*'+times+' - (available:' + upstreamAccount.available + ' / sellPrice:'+sellPrice+') = ' +
-                        (parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)/sellPrice));
+                        left);
 
-                    if(parseFloat(setting.volume) * times - parseFloat(upstreamAccount.available)/sellPrice > 0){
+                    if(left > 0){
+                        // 禁止买方向的交易
+                        if(marketplace === setting.marketplace_a) side_a = Setting.SIDE_BUY_FORBIDDEN;
+                        else side_b = Setting.SIDE_BUY_FORBIDDEN;
                         // 提交一个平衡账户的订单
-                        await Order.balance({
-                            marketplace,
-                            market: setting.market,
-                            currencies,
-                            side: Order.SIDE_SELL
-                        });
+                        // await Order.balance({
+                        //     marketplace,
+                        //     market: setting.market,
+                        //     currencies,
+                        //     side: Order.SIDE_SELL
+                        // });
                     }
                 }
+
             }
 
             totalAmount = Decimal(totalAmount).add(Decimal(amounts[0]).mul(sellPrice).add(amounts[1]).toNumber()).toNumber().toFixed(6);
         }
+
+        setting.update({ side_a, side_b });
+
         AccountStatistics.create({
             market: setting.market,
             marketplace_a: setting.marketplace_a,

@@ -1,7 +1,7 @@
 const Marketplace = require('./Marketplace');
 const request = require('../definitions/request');
 const crypto = require('crypto');
-const Decimal = require('decimal');
+const Decimal = require('../definitions/decimal');
 
 const Error = require('./response/Error');
 const Market = require('./response/Market');
@@ -104,6 +104,8 @@ class Zb extends Marketplace {
             const res = JSON.parse(await request(url));
             if(res.code && parseInt(res.code) === 1000){
                 return new Order(res.id || -1, true, res.message);
+            }else if(res.message.indexOf('委托繁忙，请稍后委托') > -1){
+                return new Order(res.id || -1, true, res.message, Order.NEED_TRADE);
             }else{
                 return this.Error(res);
             }
@@ -186,7 +188,7 @@ class Zb extends Marketplace {
     }
 
     getFee(amount) {
-        return parseFloat(amount) * 0.2 / 100;
+        return Decimal(amount).mul(0.2).div(100).toNumber();
     }
 
     Error(e){
@@ -210,7 +212,7 @@ class Zb extends Marketplace {
                 break;
             case 1001:
             default:
-                if(message === 'Error order id'){
+                if(message.indexOf('Error order id') > -1){
                     code = Error.ERROR_ORDER_ID;    // 订单不存在(重复撤单，订单号不对等)
                 }else{
                     code = Error.ERROR;

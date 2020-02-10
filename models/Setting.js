@@ -15,18 +15,16 @@ Setting.init({
     trade_timeout: Sequelize.INTEGER,   // 交易超时阈值(s)
     check_cron: Sequelize.STRING,
     enabled: Sequelize.BOOLEAN,
+    side_a: Sequelize.STRING,           // A 交易方向限制
+    side_b: Sequelize.STRING,           // B 交易方向限制
 }, {
     sequelize,
     tableName: 'setting',
     timestamps: false,
 });
 
-Setting.instance = function(){
-    return Setting.findOne({
-        // where: {
-            // enabled: true
-        // }
-    });
-};
+Setting.SIDE_BUY_FORBIDDEN = 'buy_forbidden';
+Setting.SIDE_SELL_FORBIDDEN = 'sell_forbidden';
+Setting.SIDE_UN_FORBIDDEN = 'un_forbidden';
 
 exports = module.exports = Setting;
