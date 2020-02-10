@@ -19,16 +19,19 @@ class Okex extends Marketplace {
         super(market);
 
         const timeout = 30000;
-        const tunnelProxy = tunnel.httpsOverHttp({
-            proxy: {
-                host: '127.0.0.1',
-                port: '1080'
-            },
-        });
-        const axiosConfig = {
-            proxy: false,
-            httpsAgent: tunnelProxy
-        };
+        let axiosConfig = {};
+        if(process.env.NODE_ENV !== 'production'){
+            const tunnelProxy = tunnel.httpsOverHttp({
+                proxy: {
+                    host: '127.0.0.1',
+                    port: '1080'
+                },
+            });
+            axiosConfig = {
+                proxy: false,
+                httpsAgent: tunnelProxy
+            };
+        }
 
         this.pClient = new PublicClient(process.env.OKEX_ENDPOINT, timeout, axiosConfig);
 

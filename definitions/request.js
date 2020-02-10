@@ -7,11 +7,10 @@ const request = async (options) => {
 
     if(typeof(options)=='string'){
         options = {
-            uri: options,
-            proxy: "http://127.0.0.1:1080/",
-            rejectUnauthorized: false
+            uri: options
         };
-    }else{
+    }
+    if(process.env.NODE_ENV !== 'production'){
         options.proxy = "http://127.0.0.1:1080/";
         options.rejectUnauthorized = false;
     }
