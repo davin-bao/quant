@@ -2,3 +2,5 @@
 /node_modules/*
 /tmp
 /*.pid
+/.env
+/data.db
