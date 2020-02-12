@@ -113,7 +113,7 @@ class Order extends Model {
         } else {
             failedTimes ++;
         }
-        F.cache.set2(cacheKey, failedTimes, '1 hour');
+        F.cache.set2(cacheKey, failedTimes, '5 minutes');
         Log.Info(__filename, '累计连续失败交易次数：' + failedTimes);
     }
     // 查询订单
