@@ -147,7 +147,7 @@ class Okex extends Marketplace {
         }
     }
 
-    async orders(side, price, volume, orderId) {
+    async orders(side, price, volume, orderId, accountId = 0) {
         // order_type:
         // 0：普通委托（order type不填或填0都是普通委托）
         // 1：只做Maker（Post only）

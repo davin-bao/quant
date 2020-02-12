@@ -40,7 +40,7 @@ class Order extends Model {
         // }
         // 发起交易请求
         const mp = MarketplaceManager.get(marketplace, self.market);
-        let orderResult = await mp.orders(self.side, self.price, self.volume, self.id);
+        let orderResult = await mp.orders(self.side, self.price, self.volume, self.id, account.account_id);
 
         if(orderResult instanceof Error){
             if(orderResult.code === Error.ACCOUNT_NOT_ENOUGH){
@@ -100,6 +100,21 @@ class Order extends Model {
                 await account.lock(self.volume, {transaction: t, relate_id: self.id});
             }
         });
+
+        // 连续失败的交易次数
+        const cacheKey = 'TRADE|FAILED_TIME|' + marketplace + '|' + self.market;
+        // 累计连续失败的交易次数
+        let failedTimes = parseInt(F.cache.get(cacheKey));
+        if (!failedTimes) {
+            failedTimes = 1;
+        }
+        if(orderResult.result) {
+            failedTimes = 0;
+        } else {
+            failedTimes ++;
+        }
+        F.cache.set2(cacheKey, failedTimes, '1 hour');
+        Log.Info(__filename, '累计连续失败交易次数：' + failedTimes);
     }
     // 查询订单
     async query() {
@@ -194,7 +209,7 @@ class Order extends Model {
         const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
         const mp = MarketplaceManager.get(marketplace, self.market);
 
-        let orderResult = await mp.orders(self.side, -1, self.volume, self.id);
+        let orderResult = await mp.orders(self.side, -1, self.volume, self.id, account.account_id);
 
         if(orderResult instanceof Error){
             if(orderResult.code === Error.ACCOUNT_NOT_ENOUGH){

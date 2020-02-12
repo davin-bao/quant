@@ -77,7 +77,7 @@ class Zb extends Marketplace {
         return accounts;
     }
 
-    async orders(side, price, volume, orderId) {
+    async orders(side, price, volume, orderId, accountId = 0) {
         const nonce = new Date().getTime();
 
         if(price < 0){

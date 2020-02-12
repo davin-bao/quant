@@ -107,6 +107,7 @@ class Account extends Model {
 }
 
 Account.init({
+    account_id: Sequelize.STRING,
     marketplace: Sequelize.STRING,
     currency: Sequelize.STRING,
     available: Sequelize.DECIMAL,   // 可用余额

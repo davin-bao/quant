@@ -11,6 +11,7 @@ Error.ERROR = 1001;                         // 通用异常
 Error.ACCOUNT_NOT_ENOUGH = 2000;            // 币币交易账户余额不足
 Error.ORDER_FINISHED_WHEN_CANCEL = 3001;    // 撤单时订单已成交
 Error.ERROR_ORDER_ID = 90001;               // Error order id | 订单不存在(重复撤单，订单号不对等)
+Error.ACCOUNT_NOT_EXIST = 90002;            // account for type and user id does not exist
 
 
 

@@ -4,6 +4,13 @@ class Depth {
         this.size = size;
         this.asks = asks;
         this.bids = bids;
+
+        if(asks.length > size){
+            this.asks = asks.slice(0, size);
+        }
+        if(bids.length > size){
+            this.bids = bids.slice(0, size);
+        }
         this.timestamp = timestamp;
     }
 

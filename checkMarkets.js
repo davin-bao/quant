@@ -11,7 +11,7 @@ dotenv.config('./env');
 
 const check = async function() {
     const setting = await Setting.findOne();
-    const markets = await MarketplaceManager.getAllSame(setting.marketplace_a, setting.marketplace_b);
+    const markets = await MarketplaceManager.getAllSame('hbg', 'okex');
     // const volume = setting.volume;
     // const safe_ratio = setting.safe_ratio;
 
