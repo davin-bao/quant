@@ -13,7 +13,7 @@ dotenv.config('./env');
 require('total.js');
 
 
-const marketplace = 'hbg';
+const marketplace = 'gate';
 
 const check = async function() {
     const mp = await MarketplaceManager.get(marketplace, 'etc_usdt');
@@ -22,28 +22,25 @@ const check = async function() {
     // const result = await mp.validateTimestamp();
     // 市场
     // const markets = await mp.getMarkets();
+    // console.log(markets);
+
     // 获取深度
-    // const depth = await mp.getDepth(5);
+    // const depth = await mp.getDepth(2);
+    // console.log(depth);
 
     // 账户
     // const account = await mp.getAccount('usdt');
+    // console.log(account);
     // 交易
-    const order = await mp.orders('sell', '12', 0.01, '1233', 10269865);
+    // const order = await mp.orders('sell', '13', 0.1, '1233', 10269865);
+    // console.log(order);
+    // 取消交易
+    // const orderCancel = await mp.ordersCancel('12345');
+    // console.log(orderCancel);
     // 查询交易
     //  const query = await mp.ordersQuery('1234556');
-    // 取消交易
-    //  const query = await mp.ordersCancel('12345');
+    // console.log(query);
 
-
-    console.log(order);
-
-};
-
-const Log = function(filename, msg) {
-        const dt = dateTime.create();
-        const pwd = process.cwd();
-        console.log(msg);
-        fs.appendFileSync(pwd+'/logs/check-' + marketplace+ '-' + dt.format('y-m-d') + '.log', msg+"\n");
 };
 
 check().then(e=>{});

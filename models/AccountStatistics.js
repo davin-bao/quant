@@ -29,7 +29,7 @@ AccountStatistics.init({
 });
 
 AccountStatistics.sync = async function() {
-    const times = 6;
+    const times = 5;
     const settings  = await Setting.findAll({
         enabled: true
     });

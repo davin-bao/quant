@@ -114,6 +114,7 @@ class Hbg extends Marketplace {
         return this.Error(res);
     }
 
+    // // 单笔 价格*数量 >= 1.00000000
     async orders(side, price, volume, orderId, accountId = 0){
         orderId = guid();
         try{
@@ -148,7 +149,6 @@ class Hbg extends Marketplace {
                 return this.Error(res);
             }
         }catch(e){
-            console.log(e);
             return this.Error(e);
         }
     }

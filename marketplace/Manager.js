@@ -3,6 +3,8 @@ const market = require('./Marketplace');
 const Zb = require('./Zb');
 const Okex = require('./Okex');
 const Hbg = require('./Hbg');
+const Binance = require('./Binance');
+const Gate = require('./Gate');
 
 class Manager {
     //构造函数
@@ -14,6 +16,10 @@ class Manager {
                 return new Okex(market);
             case 'hbg':
                 return new Hbg(market);
+            case 'binance':
+                return new Binance(market);
+            case 'gate':
+                return new Gate(market);
             default:
                 throw new Error('不支持的交易平台:' + place);
         }
