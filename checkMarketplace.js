@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 const dateTime = require('node-datetime');
+const Log = require('./definitions/Log');
 const Decimal = require('./definitions/decimal');
 const { loop } = require('./definitions/utils');
 const MarketplaceManager = require('./marketplace/Manager');
@@ -13,10 +14,11 @@ dotenv.config('./env');
 require('total.js');
 
 
-const marketplace = 'gate';
+const marketplace = 'poloniex';
 
 const check = async function() {
     const mp = await MarketplaceManager.get(marketplace, 'etc_usdt');
+    Log.Info(__filename, 'Starting...');
 
     // 查询系统时间差异
     // const result = await mp.validateTimestamp();
@@ -25,6 +27,7 @@ const check = async function() {
     // console.log(markets);
 
     // 获取深度
+
     // const depth = await mp.getDepth(2);
     // console.log(depth);
 
@@ -44,3 +47,20 @@ const check = async function() {
 };
 
 check().then(e=>{});
+
+
+const Account = require('./models/Account');
+
+Account.create({
+    marketplace: 'poloniex',
+    currency: 'etc',
+    available: 0,
+    locked: 0
+});
+
+Account.create({
+    marketplace: 'poloniex',
+    currency: 'usdt',
+    available: 0,
+    locked: 0
+});

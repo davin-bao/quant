@@ -5,6 +5,10 @@ const Okex = require('./Okex');
 const Hbg = require('./Hbg');
 const Binance = require('./Binance');
 const Gate = require('./Gate');
+const Aofex = require('./Aofex');
+const Biki = require('./Biki');
+const Fatbtc = require('./Fatbtc');
+const Poloniex = require('./Poloniex');
 
 class Manager {
     //构造函数
@@ -20,6 +24,14 @@ class Manager {
                 return new Binance(market);
             case 'gate':
                 return new Gate(market);
+            case 'aofex':
+                return new Aofex(market);
+            case 'biki':
+                return new Biki(market);
+            case 'fatbtc':
+                return new Fatbtc(market);
+            case 'poloniex':
+                return new Poloniex(market);
             default:
                 throw new Error('不支持的交易平台:' + place);
         }

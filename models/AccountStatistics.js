@@ -35,6 +35,7 @@ AccountStatistics.sync = async function() {
     });
     for(const setting of settings){
         const marketplaces =[setting.marketplace_a, setting.marketplace_b];
+        console.log(marketplaces, setting.market); 
         const currencies = setting.market.split('_').trim();
         let totalAmount = 0;
         const currencyAmount = [];
