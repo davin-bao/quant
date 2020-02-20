@@ -9,6 +9,7 @@ const AccountLog = require('../models/AccountLog');
 const Setting = require('../models/Setting');
 const AccountStatistics = require('../models/AccountStatistics');
 const MarketplaceManager = require('../marketplace/Manager');
+const Lstm = require('../strategy/Lstm');
 
 const Op = Sequelize.Op;
 
@@ -20,7 +21,7 @@ exports.install = function() {
     ROUTE('GET /logout', get_logout,   ['authorize']);
 
     ROUTE('GET /dashboard',        get_dashboard, ['authorize', '@admin']);
-    ROUTE('GET /dashboard/{setting_id}',        get_dashboard, ['authorize', '@admin']);
+    ROUTE('GET /dashboard/{setting_id}', get_dashboard, ['authorize', '@admin']);
     ROUTE('GET /dashboard-account-statistics-chart', get_dashboard_account_statistics_chart, ['authorize', '@admin']);
     ROUTE('GET /dashboard-hedge-profit-chart', get_dashboard_hedge_profit_chart, ['authorize', '@admin']);
     ROUTE('GET /dashboard-hedge-life-chart', get_dashboard_hedge_life_chart, ['authorize', '@admin']);
@@ -43,6 +44,8 @@ exports.install = function() {
     ROUTE('GET /account_log/{accountId}',   get_account_log_detail, ['authorize', '@admin']);
     ROUTE('POST /account_log',  post_account_log_index, ['authorize', '@admin']);
     ROUTE('POST /account_sync', post_account_sync, ['authorize', '@admin']);
+    ROUTE('GET /predict', get_predict_detail, ['authorize', '@admin']);
+    ROUTE('POST /predict', post_predict_detail, ['put', 600000, 'authorize', '@admin']);
 };
 
 function get_index() {
@@ -815,4 +818,26 @@ async function post_account_sync() {
     await Account.sync();
 
     self.json({code: 200, msg: 'success'});
+}
+
+function get_predict_detail(marketplace, market, granularity) {
+    //
+    const self = this;
+
+    self.view('predict', { market, marketplace, granularity });
+}
+
+async function post_predict_detail() {
+    //
+    const self = this;
+    const lstm = new Lstm(this.body);
+    const { labels, testData, predData } = await lstm.trainModel();
+
+    const res = {
+        labels,
+        testData,
+        predData
+    };
+
+    self.json({ code: 200, msg: 'success', data: res });
 }

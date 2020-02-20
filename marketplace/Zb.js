@@ -105,7 +105,7 @@ class Zb extends Marketplace {
             if(res.code && parseInt(res.code) === 1000){
                 return new Order(res.id || -1, true, res.message);
             }else if(res.message.indexOf('委托繁忙，请稍后委托') > -1){
-                return new Order(res.id || -1, true, res.message, Order.NEED_TRADE);
+                return new Order(res.id || -1, false, res.message, Order.NEED_TRADE);
             }else{
                 return this.Error(res);
             }

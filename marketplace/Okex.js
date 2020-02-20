@@ -1,12 +1,14 @@
-const Marketplace = require('./Marketplace');
-const request = require('../definitions/request');
 const { PublicClient, AuthenticatedClient } = require('@okfe/okex-node');
 const crypto = require('crypto');
+var querystring = require('querystring');
+const Marketplace = require('./Marketplace');
+const request = require('../definitions/request');
 const Decimal = require('../definitions/decimal');
 
 const Log = require('../definitions/Log');
 const Error = require('./response/Error');
 const Market = require('./response/Market');
+const Candle = require('./response/Candle');
 const Depth = require('./response/Depth');
 const Account = require('./response/Account');
 const Order = require('./response/Order');
@@ -72,6 +74,33 @@ class Okex extends Marketplace {
         });
 
         return markets;
+    }
+
+    async candles(needArr = false, granularity, start, end){
+
+        const query = { granularity };
+        if (start) query.start = start;
+        if (end) query.end = end;
+        const url = process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/' + this.market.toUpperCase().replace('_', '-') + '/candles?' + querystring.stringify(query);
+        const res = JSON.parse(await request(url));
+
+        if(!Array.isArray(res)) return [];
+        
+        const candles = [];
+        for (let i = 0; i < res.length; i++) {
+            candles.push(
+                new Candle(
+                    res[i][0],
+                    res[i][1],
+                    res[i][4],
+                    res[i][2],
+                    res[i][3],
+                    res[i][5]
+                )
+            );
+        }
+
+        return candles;
     }
 
     async getDepth(size){

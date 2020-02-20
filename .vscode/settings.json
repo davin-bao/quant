@@ -1,0 +1,7 @@
+{
+    "workbench.tree.indent": 15,
+    "editor.tabCompletion": "on",
+    "search.exclude": {
+        "**/node_modules": false
+    }
+}

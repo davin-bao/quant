@@ -1,0 +1,111 @@
+@{title('LSTM')}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="#">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">LSTM</li>
+</ol>
+@{end}
+<!-- ============================================================== -->
+<!-- Sales chart -->
+<!-- ============================================================== -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <!-- column -->
+                    <div class="col-lg-12">
+                        <div class="d-md-flex align-items-center">
+                            <div>
+                                <h4 class="card-title">LSTM 预测</h4>
+                                <h5 class="card-subtitle">成功的交易纯利/毛利/费用累计</h5>
+                            </div>
+                        </div>
+                        <div class="flot-chart">
+                            <div id="ai-lstm-legend" class="chart-legend"></div>
+                            <canvas class="flot-chart-content" id="ai-lstm-chart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
+                    <!-- column -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- Recent comment and chats -->
+<!-- ============================================================== -->
+@{section script}
+<script src="../../dist/js/chart.js"></script>
+
+<script type="application/javascript">
+    const market = "@{model.market || 'etc_usdt'}";
+    const marketplace = "@{model.marketplace || 'okex'}";
+    const granularity = "@{model.granularity || 3600}";
+    
+    const aiLstmCtx = document.getElementById("ai-lstm-chart").getContext("2d");
+    let aiLstmChart = null;
+
+    function getAiLstmData() {
+        $.ajax({
+            url: "/predict",
+            type: "POST",
+            timeout: 600000,
+            data: {
+                market,
+                marketplace,
+                granularity
+            },
+            dataType: 'json',
+            success: function (res) {
+                if (res.code === 200) {
+                    if (!aiLstmChart) {
+                        aiLstmChart = new Chart(aiLstmCtx).Line({
+                            labels: res.data.labels,
+                            datasets: [
+                                {
+                                    label: '实际',
+                                    fillColor: "rgba(27,205,0,0.2)",
+                                    strokeColor: "rgb(130,205,62)",
+                                    pointColor: "rgb(27,205,0)",
+                                    pointStrokeColor: "#fff",
+                                    pointHighlightFill: "#fff",
+                                    pointHighlightStroke: "rgb(27,205,0)",
+                                    data: res.data.testData
+                                },
+                                {
+                                    label: '预测',
+                                    fillColor: "rgba(151,187,205,0.2)",
+                                    strokeColor: "rgba(151,187,205,1)",
+                                    pointColor: "rgba(151,187,205,1)",
+                                    pointStrokeColor: "#fff",
+                                    pointHighlightFill: "#fff",
+                                    pointHighlightStroke: "rgba(151,187,205,1)",
+                                    data: res.data.predData
+                                }
+                            ]
+                        }, {});
+                    } else {
+                        for (let i = 0; i < res.data.labels.length; i++) {
+                            aiLstmChart.datasets[0].points[i] && (aiLstmChart.datasets[0].points[i].value = res.data.testData[i]);
+                            aiLstmChart.datasets[1].points[i] && (aiLstmChart.datasets[1].points[i].value = res.data.predData[i]);
+                        }
+
+                        aiLstmChart.update();
+                    }
+
+                    document.getElementById('ai-lstm-legend').innerHTML = aiLstmChart.generateLegend();
+                } else {
+                    alert('获取数据失败');
+                }
+            }
+        });
+    }
+
+    $(function () {
+        getAiLstmData();
+    });
+</script>
+@{end}

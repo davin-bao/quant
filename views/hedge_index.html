@@ -37,7 +37,7 @@
 							<th>状态</th>
 							<th>交易量</th>
 							<th>价格</th>
-							<th>时间</th>
+							<th>备注</th>
 						</tr>
 					</thead>
 					<tbody id="order-body"></tbody>
@@ -104,7 +104,7 @@
 						let domState = '<td>'+item.state+'</td>';
 						let domVolume = '<td>'+toFixed(item.volume, 8)+'</td>';
 						let domPrice = '<td>'+toFixed(item.price, 8)+'</td>';
-						let domCTime = '<td>'+item.ctime+'</td>';
+						let domMemo = '<td>' + item.memo + '</td>';
 						domRowContent += '<tr>' +
                                 domId +
 								domOrderId +
@@ -113,7 +113,7 @@
 								domState +
 								domVolume +
 								domPrice +
-								domCTime +
+								domMemo +
                         '</tr>';
 					});
 
