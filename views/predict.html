@@ -18,13 +18,40 @@
                     <div class="col-lg-12">
                         <div class="d-md-flex align-items-center">
                             <div>
-                                <h4 class="card-title">LSTM 预测</h4>
-                                <h5 class="card-subtitle">成功的交易纯利/毛利/费用累计</h5>
+                                <h4 class="card-title">LSTM 训练</h4>
+                                <h5 class="card-subtitle">
+                                    <button class="btn btn-info mr-1" onclick="train()">训练模型</button>
+                                </h5>
                             </div>
                         </div>
                         <div class="flot-chart">
-                            <div id="ai-lstm-legend" class="chart-legend"></div>
-                            <canvas class="flot-chart-content" id="ai-lstm-chart" width="400" height="400"></canvas>
+                            <div id="train-legend" class="chart-legend"></div>
+                            <canvas class="flot-chart-content" id="train-chart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
+                    <!-- column -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <!-- column -->
+                    <div class="col-lg-12">
+                        <div class="d-md-flex align-items-center">
+                            <div>
+                                <h4 class="card-title">LSTM 预测</h4>
+                                <h5 class="card-subtitle">
+                                    <button class="btn btn-info mr-1" onclick="predict()">预测</button>
+                                    <span id="profit"></span>
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="flot-chart">
+                            <div id="predict-legend" class="chart-legend"></div>
+                            <canvas class="flot-chart-content" id="predict-chart" width="400" height="400"></canvas>
                         </div>
                     </div>
                     <!-- column -->
@@ -43,14 +70,54 @@
 <script type="application/javascript">
     const market = "@{model.market || 'etc_usdt'}";
     const marketplace = "@{model.marketplace || 'okex'}";
-    const granularity = "@{model.granularity || 3600}";
-    
-    const aiLstmCtx = document.getElementById("ai-lstm-chart").getContext("2d");
-    let aiLstmChart = null;
+    const granularity = "@{model.granularity || 900}";
 
-    function getAiLstmData() {
+    const trainCtx = document.getElementById("train-chart").getContext("2d");
+    let trainChart = null;
+    const predictCtx = document.getElementById("predict-chart").getContext("2d");
+    let predictChart = null;
+    let predictChartLabels = [], actualData = [], predData = [];
+    let predictIndex = 0;
+    const maxSize = 50;
+
+    function predict() {
         $.ajax({
             url: "/predict",
+            type: "POST",
+            timeout: 600000,
+            data: {
+                market,
+                marketplace,
+                granularity,
+                index: predictIndex
+            },
+            dataType: 'json',
+            success: function (res) {
+                if (res.code === 200) {
+                    let { labels, actualData, predData, profit, percent } = res.data;
+                    $("#profit").html('利润：' + profit + ', 收益率:' + percent + '%');
+                    
+                    if(labels.length > maxSize){
+                        labels = labels.slice(labels.length - maxSize, labels.length);
+                        actualData = actualData.slice(actualData.length - maxSize, actualData.length);
+                        predData = predData.slice(predData.length - maxSize, predData.length);
+                    }
+                    
+                    if (predictChart != null) {
+                        predictChart.destroy();
+                    }
+                    drawPredictChart({ labels, actualData, predData });
+                    predictIndex++;
+                } else {
+                    alert('获取数据失败');
+                }
+            }
+        });
+    }
+
+    function train() {
+        $.ajax({
+            url: "/train",
             type: "POST",
             timeout: 600000,
             data: {
@@ -61,42 +128,7 @@
             dataType: 'json',
             success: function (res) {
                 if (res.code === 200) {
-                    if (!aiLstmChart) {
-                        aiLstmChart = new Chart(aiLstmCtx).Line({
-                            labels: res.data.labels,
-                            datasets: [
-                                {
-                                    label: '实际',
-                                    fillColor: "rgba(27,205,0,0.2)",
-                                    strokeColor: "rgb(130,205,62)",
-                                    pointColor: "rgb(27,205,0)",
-                                    pointStrokeColor: "#fff",
-                                    pointHighlightFill: "#fff",
-                                    pointHighlightStroke: "rgb(27,205,0)",
-                                    data: res.data.testData
-                                },
-                                {
-                                    label: '预测',
-                                    fillColor: "rgba(151,187,205,0.2)",
-                                    strokeColor: "rgba(151,187,205,1)",
-                                    pointColor: "rgba(151,187,205,1)",
-                                    pointStrokeColor: "#fff",
-                                    pointHighlightFill: "#fff",
-                                    pointHighlightStroke: "rgba(151,187,205,1)",
-                                    data: res.data.predData
-                                }
-                            ]
-                        }, {});
-                    } else {
-                        for (let i = 0; i < res.data.labels.length; i++) {
-                            aiLstmChart.datasets[0].points[i] && (aiLstmChart.datasets[0].points[i].value = res.data.testData[i]);
-                            aiLstmChart.datasets[1].points[i] && (aiLstmChart.datasets[1].points[i].value = res.data.predData[i]);
-                        }
-
-                        aiLstmChart.update();
-                    }
-
-                    document.getElementById('ai-lstm-legend').innerHTML = aiLstmChart.generateLegend();
+                    drawTrainChart(res);
                 } else {
                     alert('获取数据失败');
                 }
@@ -104,8 +136,78 @@
         });
     }
 
+    function drawTrainChart(res) {
+        if (!trainChart) {
+            trainChart = new Chart(trainCtx).Line({
+                labels: res.data.labels,
+                datasets: [
+                    {
+                        label: '实际',
+                        fillColor: "rgba(27,205,0,0.2)",
+                        strokeColor: "rgb(130,205,62)",
+                        pointColor: "rgb(27,205,0)",
+                        pointStrokeColor: "#fff",
+                        pointHighlightFill: "#fff",
+                        pointHighlightStroke: "rgb(27,205,0)",
+                        data: res.data.actualData
+                    },
+                    {
+                        label: '预测',
+                        fillColor: "rgba(151,187,205,0.2)",
+                        strokeColor: "rgba(151,187,205,1)",
+                        pointColor: "rgba(151,187,205,1)",
+                        pointStrokeColor: "#fff",
+                        pointHighlightFill: "#fff",
+                        pointHighlightStroke: "rgba(151,187,205,1)",
+                        data: res.data.predData
+                    }
+                ]
+            }, {});
+        } else {
+            trainChart.labels = res.data.labels;
+            for (let i = 0; i < res.data.labels.length; i++) {
+                trainChart.datasets[0].points[i] && (trainChart.datasets[0].points[i].value = res.data.actualData[i]);
+                trainChart.datasets[1].points[i] && (trainChart.datasets[1].points[i].value = res.data.predData[i]);
+            }
+
+            trainChart.update();
+        }
+
+        document.getElementById('train-legend').innerHTML = trainChart.generateLegend();
+    }
+
+    function drawPredictChart(res) {
+        predictChart = new Chart(predictCtx).Line({
+            labels: res.labels,
+            datasets: [
+                {
+                    label: '实际',
+                    fillColor: "rgba(27,205,0,0.2)",
+                    strokeColor: "rgb(130,205,62)",
+                    pointColor: "rgb(27,205,0)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgb(27,205,0)",
+                    data: res.actualData
+                },
+                {
+                    label: '预测',
+                    fillColor: "rgba(151,187,205,0.2)",
+                    strokeColor: "rgba(151,187,205,1)",
+                    pointColor: "rgba(151,187,205,1)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgba(151,187,205,1)",
+                    data: res.predData
+                }
+            ]
+        }, {});
+
+        document.getElementById('predict-legend').innerHTML = predictChart.generateLegend();
+    }
+
     $(function () {
-        getAiLstmData();
+        //
     });
 </script>
 @{end}

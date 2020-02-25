@@ -9,7 +9,7 @@ const Op = Sequelize.Op;
 const handle = async () => {
     Log.Info(__filename, 'Account statistics ...');
 
-    AccountStatistics.sync();
+    AccountStatistics.synchronize();
 };
 
 const accountStatisticsSchedule = () => {

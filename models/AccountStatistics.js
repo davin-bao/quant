@@ -28,7 +28,7 @@ AccountStatistics.init({
     timestamps: false,
 });
 
-AccountStatistics.sync = async function() {
+AccountStatistics.synchronize = async function() {
     const times = 5;
     const settings  = await Setting.findAll({
         enabled: true

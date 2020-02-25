@@ -5,6 +5,7 @@ const schedule = require('node-schedule');
 const MarketplaceManager = require('../marketplace/Manager');
 const Log = require('../definitions/Log');
 const { Transpose } = require('../definitions/utils');
+const { window, normaliseX, normaliseY } = require('../definitions/tensorUtils');
 const Order = require('../models/Order');
 const Setting = require('../models/Setting');
 const Lstm = require('../strategy/Lstm');

@@ -11,7 +11,7 @@ const request = async (options) => {
         };
     }
     if(process.env.NODE_ENV !== 'production'){
-        options.proxy = "http://127.0.0.1:1080/";
+        options.proxy = "http://127.0.0.1:1081/";
         options.rejectUnauthorized = false;
     }
 

@@ -132,7 +132,7 @@ Account.getByMarketplaceAndCurrency = function(marketplace, currency){
     return account;
 };
 
-Account.sync = async function() {
+Account.synchronize = async function() {
     const settings  = await Setting.findAll();
     const accounts = await Account.findAll();
     for(const setting of settings){

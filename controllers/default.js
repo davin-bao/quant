@@ -45,7 +45,8 @@ exports.install = function() {
     ROUTE('POST /account_log',  post_account_log_index, ['authorize', '@admin']);
     ROUTE('POST /account_sync', post_account_sync, ['authorize', '@admin']);
     ROUTE('GET /predict', get_predict_detail, ['authorize', '@admin']);
-    ROUTE('POST /predict', post_predict_detail, ['put', 600000, 'authorize', '@admin']);
+    ROUTE('POST /train', post_train_detail, ['put', 600000, 'authorize', '@admin']);
+    ROUTE('POST /predict', post_predict_detail, ['put', 60000, 'authorize', '@admin']);
 };
 
 function get_index() {
@@ -815,7 +816,7 @@ async function post_account_log_index() {
 
 async function post_account_sync() {
     const self = this;
-    await Account.sync();
+    await Account.synchronize();
 
     self.json({code: 200, msg: 'success'});
 }
@@ -827,16 +828,35 @@ function get_predict_detail(marketplace, market, granularity) {
     self.view('predict', { market, marketplace, granularity });
 }
 
+async function post_train_detail() {
+    //
+    const self = this;
+    let lstm = new Lstm(this.body);
+    const res = await lstm.trainModel();
+    
+
+    // const res = {
+    //     labels,
+    //     testData,
+    //     predData
+    // };
+
+    self.json({ code: 200, msg: 'success', data: res });
+}
+
 async function post_predict_detail() {
     //
     const self = this;
     const lstm = new Lstm(this.body);
-    const { labels, testData, predData } = await lstm.trainModel();
+    // const { labels, testData, predData } = await lstm.predict();
+    const { labels, actualData, predData, profit, percent } = await lstm.predict(parseInt(self.body.index));
 
     const res = {
         labels,
-        testData,
-        predData
+        actualData,
+        predData,
+        profit, 
+        percent
     };
 
     self.json({ code: 200, msg: 'success', data: res });

@@ -14,7 +14,7 @@ dotenv.config('./env');
 require('total.js');
 
 
-const marketplace = 'poloniex';
+const marketplace = 'okex';
 
 const check = async function() {
     const mp = await MarketplaceManager.get(marketplace, 'etc_usdt');
@@ -41,26 +41,26 @@ const check = async function() {
     // const orderCancel = await mp.ordersCancel('12345');
     // console.log(orderCancel);
     // 查询交易
-    //  const query = await mp.ordersQuery('1234556');
-    // console.log(query);
+     const query = await mp.ordersQuery('1234556');
+    console.log(query);
 
 };
 
 check().then(e=>{});
 
 
-const Account = require('./models/Account');
+// const Account = require('./models/Account');
 
-Account.create({
-    marketplace: 'poloniex',
-    currency: 'etc',
-    available: 0,
-    locked: 0
-});
+// Account.create({
+//     marketplace: 'poloniex',
+//     currency: 'etc',
+//     available: 0,
+//     locked: 0
+// });
 
-Account.create({
-    marketplace: 'poloniex',
-    currency: 'usdt',
-    available: 0,
-    locked: 0
-});
+// Account.create({
+//     marketplace: 'poloniex',
+//     currency: 'usdt',
+//     available: 0,
+//     locked: 0
+// });

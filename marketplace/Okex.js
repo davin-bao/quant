@@ -26,7 +26,7 @@ class Okex extends Marketplace {
             const tunnelProxy = tunnel.httpsOverHttp({
                 proxy: {
                     host: '127.0.0.1',
-                    port: '1080'
+                    port: '1081'
                 },
             });
             axiosConfig = {
@@ -76,7 +76,7 @@ class Okex extends Marketplace {
         return markets;
     }
 
-    async candles(needArr = false, granularity, start, end){
+    async candles(needArr = false, granularity, end, start){
 
         const query = { granularity };
         if (start) query.start = start;
