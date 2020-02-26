@@ -5,18 +5,16 @@ const Model = require('./Model');
 class Setting extends Model {}
 
 Setting.init({
-    market: Sequelize.STRING,
-    marketplace_a: Sequelize.STRING,
-    marketplace_b: Sequelize.STRING,
-    depth: Sequelize.INTEGER,
-    volume_limit: Sequelize.DECIMAL,    // 挂牌量大于该值，才进行交易判断
-    volume: Sequelize.DECIMAL,          // 每次交易请求量
-    safe_ratio: Sequelize.DECIMAL,      // 安全系数
-    trade_timeout: Sequelize.INTEGER,   // 交易超时阈值(s)
-    check_cron: Sequelize.STRING,
-    enabled: Sequelize.BOOLEAN,
-    side_a: Sequelize.STRING,           // A 交易方向限制
-    side_b: Sequelize.STRING,           // B 交易方向限制
+    market: { type: Sequelize.STRING, comment: '市场' },
+    marketplace: { type: Sequelize.STRING, comment: '交易所' },
+    granularity: { type: Sequelize.INTEGER, comment: '交易频率(s)' },
+    depth: { type: Sequelize.INTEGER, comment: '深度', defaultValue: 5 },
+    volume_limit: { type: Sequelize.DECIMAL(20,8), comment: '挂牌量大于该值，才进行交易判断', defaultValue: 0.1 },
+    volume: { type: Sequelize.DECIMAL(20,8), comment: '每次交易请求量', defaultValue: 0.01 },
+    trade_timeout: { type: Sequelize.INTEGER, comment: '交易超时阈值(s)', defaultValue: 240 },
+    check_cron: { type: Sequelize.STRING, comment: '交易检测定时', defaultValue: '*/10 * * * * *' },
+    enabled: { type: Sequelize.BOOLEAN, comment: '启用', defaultValue: true },
+    side: { type: Sequelize.STRING, comment: '交易方向限制', defaultValue: 'un_forbidden' }
 }, {
     sequelize,
     tableName: 'setting',

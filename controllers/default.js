@@ -848,7 +848,8 @@ async function post_predict_detail() {
     //
     const self = this;
     const lstm = new Lstm(this.body);
-    // const { labels, testData, predData } = await lstm.predict();
+    await lstm.init();
+    
     const { labels, actualData, predData, profit, percent } = await lstm.predict(parseInt(self.body.index));
 
     const res = {

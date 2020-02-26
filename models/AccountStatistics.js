@@ -16,11 +16,11 @@ AccountStatistics.init({
     market: Sequelize.STRING,
     marketplace_a: Sequelize.STRING,
     marketplace_b: Sequelize.STRING,
-    amount: Sequelize.DECIMAL,   // 估值
-    currency_a_a: Sequelize.DECIMAL,
-    currency_a_b: Sequelize.DECIMAL,
-    currency_b_a: Sequelize.DECIMAL,
-    currency_b_b: Sequelize.DECIMAL,
+    amount: Sequelize.DECIMAL(20,8),   // 估值
+    currency_a_a: Sequelize.DECIMAL(20,8),
+    currency_a_b: Sequelize.DECIMAL(20,8),
+    currency_b_a: Sequelize.DECIMAL(20,8),
+    currency_b_b: Sequelize.DECIMAL(20,8),
     ctime: Sequelize.DATE,
 }, {
     sequelize,

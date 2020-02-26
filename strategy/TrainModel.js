@@ -21,7 +21,7 @@ const volume = 1;
 let orders = [];
 let account = 0;
 
-class TradeTest {
+class TrainModel {
     constructor(options = {}) {
         this.market = options.market;
         this.marketplace = options.marketplace;
@@ -33,6 +33,11 @@ class TradeTest {
             granularity: this.granularity,
             stepSize: this.stepSize
         });
+    }
+
+    async train() {
+        const { labels, candles } = this.getInstruments(TEST_SIZE);
+        this.lstm.trainModel(labels, candles);
     }
 
     async do() {
@@ -154,19 +159,36 @@ class TradeTest {
         }
     }
 
-    async getTestCandles(count = 200) {
-        const cachePath = './logs/candles_' + this.marketplace + '_' + this.market + '_' + this.granularity + '_test_' + count + '.cache';
-        const candles = await this.getCandles(count, cachePath);
+    async getInstruments(count = 200) {
+        const result = await Instrument.findAll({
+            limit: count,
+            order: [
+                ['label', 'DESC'],
+            ]
+        });
 
-        // 删除 time 列
         const data = [];
         const labels = [];
-        candles.forEach(candle => {
-            labels.push(candle.time);
-            data.push([candle.open, candle.close, candle.high, candle.low, candle.volume]);
-        });
+        for (const item of result){
+            labels.push(item.time);
+            data.push([
+                item.open, 
+                item.close, 
+                item.open - item.close,
+                item.high - item.low, 
+                item.volume,
+                item.ask,
+                item.bid,
+                item.high_diff,
+                item.low_diff,
+                item.close10,
+                item.close20,
+                item.close_low10,
+                item.close_high20,
+            ]);
+        }
         
-        return { labels, candles: data, candleRaws: candles };
+        return { labels, candles: data };
     }
 
     async getCandles(count, cachePath) {
@@ -196,4 +218,4 @@ class TradeTest {
     }
 }
 
-exports = module.exports = TradeTest;
+exports = module.exports = TrainModel;

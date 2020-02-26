@@ -51,11 +51,11 @@ class Lstm {
 
     async predict(index = 0, options) {
         let model = this.model;
-        const { labels, candles, candleRaws } = options;
+        // const { labels, candles, candleRaws } = options;
 
-        // const { labels, candles, candleRaws } = await this.getTrainCandles(TRAIN_COUNT);
+        const { labels, candles, candleRaws } = await this.getTrainCandles(TRAIN_COUNT);
         
-        const res = await this.predictCell(model, candles, labels, candleRaws, index);
+        const res = await this.predictCell(this.model, candles, labels, candleRaws, index);
         
         if (predLabels.length < 1){
             predLabels = res.labels;
@@ -80,9 +80,9 @@ class Lstm {
         };
     }
 
-    async trainModel(){
+    async trainModel(labels, candles){
         // 数据准备
-        const { labels, candles, candleRaws } = await this.getTrainCandles(TRAIN_COUNT);
+        // const { labels, candles, candleRaws } = await this.getTrainCandles(TRAIN_COUNT);
 
         // 测试 训练数据分割
         const splitRow = candles.length - parseInt(SPLIT_RATIO * candles.length);
@@ -130,11 +130,9 @@ class Lstm {
         // }
 
         await model.save('file://model/' + this.modelName);
-
-        return await this.predictCell(model, testCandles, testLabels, candleRaws, 0);
     }
 
-    async predictCell(model, candles, labels, candleRaws, index){
+    async predictCell(model, candles, labels, index){
         if (index + this.stepSize + TARGET_SIZE + 1 >= labels.length) {
             return { labels: [], actualData: [], predData: [] };
         }

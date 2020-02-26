@@ -51,7 +51,7 @@ exports.Transpose = function (data, cols) {
     var res = [];
     for (let i = 0; i < data.length; i++) {
         if (cols.length === 1) res.push(data[i][cols[0]]);
-        else{
+        else {
             const row = [];
             for (let j = 0; j < cols.length; j++) {
                 row.push(data[i][cols[j]]);
@@ -59,7 +59,13 @@ exports.Transpose = function (data, cols) {
             res.push(row);
         }
     }
-    
+
     return res;
+};
+exports.Sleep = function (microSeconds = 1000) {
+    var start = (new Date()).getTime();
+    while ((new Date()).getTime() - start < microSeconds) {
+        continue;
+    }
 };
 

@@ -1,3 +1,4 @@
+const Decimal = require('../../definitions/decimal');
 
 class Depth {
     constructor(size, asks, bids, timestamp){
@@ -12,6 +13,25 @@ class Depth {
             this.bids = bids.slice(0, size);
         }
         this.timestamp = timestamp;
+    }
+
+    getAver(data) {
+        if ((data instanceof Array) && data.length > 0) {
+            let sum = 0;
+            for (const item of data) {
+                sum = Decimal(item[0]).mul(item[1]).add(sum).toNumber();
+            }
+            return Decimal(sum).div(data.length).toNumber();
+        }
+        return 0;
+    }
+
+    getAverAsk() {
+        return this.getAver(this.asks);
+    }
+
+    getAverBid() {
+        return this.getAver(this.bids);
     }
 
     getFirstAsks() {

@@ -7,7 +7,9 @@ const models = [
     'AccountStatistics',
     'Hedge',
     'Order',
-    'Setting'
+    'Setting',
+    'ModelSetting',
+    'Instrument'
 ];
 
 for(let model of models){
