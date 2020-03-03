@@ -6,7 +6,7 @@ const schedule = require('node-schedule');
 const Log = require('./definitions/Log');
 const { Transpose } = require('./definitions/utils');
 const { window, normaliseX, normaliseY, unormaliseY } = require('./definitions/tensorUtils');
-const TradeTest = require('./strategy/TradeTest');
+const Setting = require('./models/Setting');
 
 require('total.js');
 require('tfjs-node-save');
@@ -14,15 +14,14 @@ require('tfjs-node-save');
 dotenv.config('./env');
 
 const check = async function() {
-    const tradeTest = new TradeTest({
-        market: 'etc_usdt',
-        marketplace: 'okex',
-        granularity: 900
+    const settings = await Setting.findAll({
+        where: { enabled: true }
     });
 
-    await tradeTest.do();
-
-    // console.log('利润：' + profit + ', 收益率:' + percent + '%');
+    for(setting of settings){
+        const result = await setting.test();
+        console.log('SettingID: '+ setting.id + ' 利润：' + result.profit + ', 收益率:' + result.percent + '%', result);
+    }
 };
 
 check().then(e=>{});

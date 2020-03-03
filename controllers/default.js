@@ -7,6 +7,8 @@ const Order = require('../models/Order');
 const Account = require('../models/Account');
 const AccountLog = require('../models/AccountLog');
 const Setting = require('../models/Setting');
+const ModelSetting = require('../models/ModelSetting');
+const Instrument = require('../models/Instrument');
 const AccountStatistics = require('../models/AccountStatistics');
 const MarketplaceManager = require('../marketplace/Manager');
 const Lstm = require('../strategy/Lstm');
@@ -44,9 +46,12 @@ exports.install = function() {
     ROUTE('GET /account_log/{accountId}',   get_account_log_detail, ['authorize', '@admin']);
     ROUTE('POST /account_log',  post_account_log_index, ['authorize', '@admin']);
     ROUTE('POST /account_sync', post_account_sync, ['authorize', '@admin']);
-    ROUTE('GET /predict', get_predict_detail, ['authorize', '@admin']);
+    ROUTE('GET /model_setting/{settingId}', get_model_setting_index, ['authorize', '@admin']);
+    ROUTE('POST /model_setting', post_model_setting_index, ['authorize', '@admin']);
     ROUTE('POST /train', post_train_detail, ['put', 600000, 'authorize', '@admin']);
-    ROUTE('POST /predict', post_predict_detail, ['put', 60000, 'authorize', '@admin']);
+    ROUTE('POST /predict', post_predict_detail, ['authorize', '@admin']);
+    ROUTE('POST /profit', post_profit_detail, ['authorize', '@admin']);
+    ROUTE('POST /ema', post_ema_detail, ['authorize', '@admin']);
 };
 
 function get_index() {
@@ -139,14 +144,14 @@ async function post_dashboard_settings(){
     const sort = getSort(self.body);
 
     const settings = await Setting.findAll({
-        limit: self.body.length,
-        offset: self.body.start,
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
         order: sort
     });
 
     const result = [];
     for(const setting of settings){
-        const { market, marketplace_a, marketplace_b } = setting;
+        const { market, marketplace } = setting;
 
         const { profit } = await Hedge.findOne({
             raw: true,
@@ -154,15 +159,10 @@ async function post_dashboard_settings(){
             where: {
                 state: Hedge.SUCCESS,
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             },
         });
 
@@ -171,15 +171,10 @@ async function post_dashboard_settings(){
             attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']],
             where: {
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             }
         });
         const { success } = await Hedge.findOne({
@@ -188,23 +183,17 @@ async function post_dashboard_settings(){
             where: {
                 state: Hedge.SUCCESS,
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             },
         });
 
         result.push({
             id: setting.id,
             market: setting.market,
-            marketplace_a: setting.marketplace_a,
-            marketplace_b: setting.marketplace_b,
+            marketplace: setting.marketplace,
             total,
             success_ratio: total == 0 ? '0.00%' : Decimal(success).div(total).mul(100).toNumber().toFixed(2) + '%',
             profit: parseFloat(profit || '0').toFixed(8),
@@ -226,14 +215,14 @@ async function get_dashboard_account_statistics_chart() {
         }
     });
 
-    const { market, marketplace_a, marketplace_b } = setting;
+    const { market, marketplace } = setting;
     const timeLimit = (new Date().getTime()) - 3600 * 24 * 1000;
 
     const accountStatistics = await AccountStatistics.findAll({
         where: {
             market,
-            marketplace_a,
-            marketplace_b,
+            marketplace_a: marketplace,
+            marketplace_b: marketplace,
             ctime: {
                 [Op.gte]: timeLimit
             }
@@ -274,8 +263,8 @@ async function get_dashboard_account_statistics_chart() {
     }
 
     const res = {
-        marketplace_a,
-        marketplace_b,
+        marketplace,
+        marketplace,
         currency_a,
         currency_b,
         currency: currency_b,
@@ -297,13 +286,13 @@ async function get_dashboard_account_statistics_chart() {
             res.amount_b = amount_b;
             break;
         case 2:
-            res.label_a = marketplace_a;
+            res.label_a = marketplace;
             res.label_b = marketplace_b;
             res.amount_a = currency_a_a;
             res.amount_b = currency_b_b;
             break;
         case 3:
-            res.label_a = marketplace_a;
+            res.label_a = marketplace;
             res.label_b = marketplace_b;
             res.amount_a = currency_a_b;
             res.amount_b = currency_b_a;
@@ -348,22 +337,17 @@ async function get_dashboard_hedge_success_chart() {
 
         self.json({code: 200, msg: 'success', data: { total, success }});
     }else{
-        const { market, marketplace_a, marketplace_b } = setting;
+        const { market, marketplace } = setting;
 
         const { total } = await Hedge.findOne({
             raw: true,
             attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']],
             where: {
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             }
         });
 
@@ -373,15 +357,10 @@ async function get_dashboard_hedge_success_chart() {
             where: {
                 state: Hedge.SUCCESS,
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             },
         });
 
@@ -410,20 +389,15 @@ async function get_dashboard_hedge_profit_chart() {
             ]
         });
     } else {
-        const { market, marketplace_a, marketplace_b } = setting;
+        const { market, marketplace } = setting;
         result = await Hedge.findAll({
             where: {
                 state: Hedge.SUCCESS,
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             },
             limit: 9999,
             order: [
@@ -497,20 +471,15 @@ async function get_dashboard_hedge_life_chart() {
             ]
         });
     } else {
-        const { market, marketplace_a, marketplace_b } = setting;
+        const { market, marketplace } = setting;
         result = await Hedge.findAll({
             where: {
                 state: Hedge.SUCCESS,
                 market,
-                [Op.or]: [
-                    {
-                        marketplace_buy: marketplace_a,
-                        marketplace_sell: marketplace_b
-                    }, {
-                        marketplace_buy: marketplace_b,
-                        marketplace_sell: marketplace_a
-                    }
-                ]
+                [Op.or]: {
+                    marketplace_buy: marketplace,
+                    marketplace_sell: marketplace
+                }
             },
             limit: 999,
             order: [
@@ -563,8 +532,8 @@ async function get_dashboard_order_side_chart() {
         });
 
         const labels = [];
-        const marketplace_a = setting.marketplace_a;
-        const marketplace_b = setting.marketplace_b;
+        const marketplace_a = setting.marketplace;
+        const marketplace_b = setting.marketplace;
         const side_a = [];
         const side_b = [];
 
@@ -623,8 +592,8 @@ async function post_setting_index() {
     const sort = getSort(self.body);
 
     const result = await Setting.findAll({
-        limit: self.body.length,
-        offset: self.body.start,
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
         order: sort
     });
 
@@ -696,8 +665,8 @@ async function post_hedge_index() {
     const sort = getSort(self.body);
 
     const result = await Hedge.findAll({
-        limit: self.body.length,
-        offset: self.body.start,
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
         order: sort
     });
 
@@ -766,8 +735,8 @@ async function post_account_index() {
     const sort = getSort(self.body);
 
     const result = await Account.findAll({
-        limit: self.body.length,
-        offset: self.body.start,
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
         order: sort
     });
 
@@ -806,8 +775,8 @@ async function post_account_log_index() {
         where: {
             account_id: self.body.account_id
         },
-        limit: self.body.length,
-        offset: self.body.start,
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
         order: sort
     });
 
@@ -821,11 +790,42 @@ async function post_account_sync() {
     self.json({code: 200, msg: 'success'});
 }
 
-function get_predict_detail(marketplace, market, granularity) {
+async function get_model_setting_index(settingId) {
     //
     const self = this;
+    const setting = await Setting.findByPk(settingId);
 
-    self.view('predict', { market, marketplace, granularity });
+    self.view('model_setting_index', { setting });
+}
+
+async function post_model_setting_index() {
+    const self = this;
+
+    const { total } = await ModelSetting.findOne({
+        raw: true,
+        attributes: [[Sequelize.fn('COUNT', Sequelize.col('id')), 'total']],
+        where: {
+            setting_id: self.body.setting_id
+        }
+    });
+
+    const sort = [];
+    for (let i = 0; i < 6; i++) {
+        if (self.body['order[' + i + '][column]']) {
+            sort.push([self.body['order[' + i + '][column]'], self.body['order[' + i + '][dir]']]);
+        }
+    }
+
+    const result = await ModelSetting.findAll({
+        where: {
+            setting_id: self.body.setting_id
+        },
+        limit: parseInt(self.body.length),
+        offset: parseInt(self.body.start),
+        order: sort
+    });
+
+    self.json({ code: 200, msg: 'success', total, data: result });
 }
 
 async function post_train_detail() {
@@ -847,18 +847,59 @@ async function post_train_detail() {
 async function post_predict_detail() {
     //
     const self = this;
-    const lstm = new Lstm(this.body);
-    await lstm.init();
-    
-    const { labels, actualData, predData, profit, percent } = await lstm.predict(parseInt(self.body.index));
+    const { index, setting_id, model_setting_id } = this.body;
+    const setting = await Setting.findByPk(setting_id);
 
-    const res = {
-        labels,
-        actualData,
-        predData,
-        profit, 
-        percent
+    let res = {
+        labels: [],
+        actualData: [],
+        predData: [],
+        profit: 0,
+        percent: 0,
+        successPercent: 0
     };
+
+    if (setting) {
+        res = await setting.trace(model_setting_id, 100, 0, parseInt(index));
+    }
+
+    self.json({ code: 200, msg: 'success', data: res });
+}
+
+async function post_profit_detail() {
+    //
+    const self = this;
+    const { index, setting_id, model_setting_id } = this.body;
+    const setting = await Setting.findByPk(setting_id);
+
+    let res = {
+        data: [],
+        profit: [],
+        successPercent: 0
+    };
+
+    if (setting) {
+        const limit = 200;
+        let offset = index * limit;
+        for(let i=0; i< limit; i++){
+            const trace = await setting.trace(model_setting_id, limit, offset, i);
+            res.data.push({label: trace.labels, profit: trace.profit});
+            res.successPercent = trace.successPercent;
+        }
+    }
+
+    self.json({ code: 200, msg: 'success', data: res });
+}
+async function post_ema_detail() {
+    //
+    const self = this;
+    const { index, setting_id, model_setting_id } = this.body;
+    
+    const res = await Instrument.getAll(200, 200, { ema: [7, 30]});
+    
+    // if (setting) {
+    //     res = await setting.trace(model_setting_id, parseInt(index));
+    // }
 
     self.json({ code: 200, msg: 'success', data: res });
 }

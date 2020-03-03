@@ -1,0 +1,346 @@
+@{title('模型列表')}
+
+@{head("../../assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.css")}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+	<li class="breadcrumb-item"><a href="#">Home</a></li>
+	<li class="breadcrumb-item active" aria-current="page">模型列表</li>
+</ol>
+@{end}
+<div class="card">
+	<div class="card-body">
+		<div class="row">
+			<div class="col-md-3">Market: @{model.setting.market}</div>
+			<div class="col-md-3">Marketplace: @{model.setting.marketplace}</div>
+		</div>
+	</div>
+</div>
+<div class="card">
+	<div class="card-body">
+		<div class="table-responsive">
+			<table id="model_setting_table" class="table table-striped table-bordered">
+			</table>
+		</div>
+	</div>
+</div>
+<div class="card">
+	<div class="card-body">
+		<div class="row">
+			<!-- column -->
+			<div class="col-lg-12">
+				<div class="d-md-flex align-items-center">
+					<div>
+						<h4 class="card-title">LSTM 预测</h4>
+						<h5 class="card-subtitle">
+							<button class="btn btn-info mr-1" onclick="predict()">预测</button>
+							<span id="profit"></span>
+						</h5>
+					</div>
+				</div>
+				<div class="flot-chart">
+					<div id="predict-legend" class="chart-legend"></div>
+					<canvas class="flot-chart-content" id="predict-chart" width="400" height="400"></canvas>
+				</div>
+			</div>
+			<div class="col-lg-12 mt-5">
+				<div class="table-responsive">
+					<table id="orders_table" class="table table-striped table-bordered">
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</div><div class="card">
+	<div class="card-body">
+		<h4 class="card-title">利润预测</h4>
+		<div id="profit"></div>
+	</div>
+</div><div class="card">
+	<div class="card-body">
+		<div id="ema"></div>
+	</div>
+</div>
+@{section script}
+<script src="../../dist/js/g2.min.js"></script>
+<script src="../../dist/js/chart.js"></script>
+<script src="../../assets/extra-libs/DataTables/datatables.min.js"></script>
+<script type="application/javascript">
+	let mainTable = null;
+	const predictCtx = document.getElementById("predict-chart").getContext("2d");
+	let settingId = 1;
+	let modelSettingId = 1;
+	let predictChart = null;
+	let predictChartLabels = [], actualData = [], predData = [];
+	let predictIndex = 0;
+	let profitIndex = 0;
+	const maxSize = 50;
+
+	$(function () {
+		mainTable = $('#model_setting_table').DataTable({
+			"searching": false,
+			// 是否允许排序
+			"ordering": true,
+			"order": [[0, 'asc']],
+			"info": true,
+			// 是否允许翻页，设成false，翻页按钮不显示
+			"paging": true,
+			"lengthChange": false,
+			"pageLength": 50,
+			"pagingType": "numbers",
+			"autoWidth": true,
+			// 是否表示 "processing" 加载中的信息，这个信息可以修改
+			"processing": true,
+			// 每次创建是否销毁以前的DataTable,默认false
+			"destroy": false,
+			"serverSide": true,
+			"ajax": {
+				// url可以直接指定远程的json文件，或是MVC的请求地址 /Controller/Action
+				url: "/model_setting",
+				type: 'POST',
+				// 传给服务器的数据，可以添加我们自己的查询参数
+				data: function (param) {
+					param.setting_id = '@{model.setting.id}';
+					param.order.forEach(item => {
+						item.column = param.columns[item.column].data;
+					});
+					delete param.columns;
+
+					return param;
+				},
+				dataFilter: function (data) {
+					var json = jQuery.parseJSON(data);
+					json.recordsTotal = json.total;
+					json.recordsFiltered = json.total;
+					// json.data = json.data;
+					return JSON.stringify(json); // return JSON string
+				}
+			},
+			dataSrc: function (myJson) {
+				return myJson;
+			},
+			columns: [
+				{ title: 'ID', data: 'id', cellType: 'th' },
+				{ title: '名称', data: 'model' },
+				{ title: '状态', data: 'enabled' },
+				{ title: '预测值涨幅', data: 'pred_diff', orderable: false },
+				{ title: '割肉阈值', data: 'loss_ratio', orderable: false },
+				{ title: '盈利阈值', data: 'win_ratio', orderable: false },
+				{
+					title: '操作',
+					data: null,
+					orderable: false,
+					render: function (data, type, row, meta) {
+						if (type === 'display') {
+							return '<a class="btn btn-info" href="#" onclick="onTrace(' + row.setting_id + ',' + row.id + ')">Trace</a>';
+						}
+
+						return data;
+					}
+				}
+			]
+		});
+		drawEma();
+		drawProfit();
+	});
+
+	function onTrace(setting_id, id) {
+		settingId = setting_id;
+		modelSettingId = id;
+		predictChart = null;
+		predictChartLabels = [];
+		actualData = [];
+		predData = [];
+		predictIndex = 0;
+
+		predict();
+	}
+
+	function predict() {
+		$.ajax({
+			url: "/predict",
+			type: "POST",
+			timeout: 600000,
+			data: {
+				setting_id: settingId,
+				model_setting_id: modelSettingId,
+				index: predictIndex
+			},
+			dataType: 'json',
+			success: function (res) {
+				if (res.code === 200) {
+					let { labels, actualData, predData, profit, percent, successPercent, orders } = res.data;
+					$("#profit").html('利润：' + profit + ', 收益率:' + percent + '%, 成功率: ' + successPercent);
+
+					if (labels.length > maxSize) {
+						labels = labels.slice(labels.length - maxSize, labels.length);
+						actualData = actualData.slice(actualData.length - maxSize, actualData.length);
+						predData = predData.slice(predData.length - maxSize, predData.length);
+					}
+
+					if (predictChart != null) {
+						predictChart.destroy();
+					}
+					drawPredictChart({ labels, actualData, predData });
+					predictIndex++;
+
+					$('#orders_table').DataTable({
+						destroy: true,
+						data: orders,
+						searching: false,
+						paging: false,
+						lengthChange: false,
+						columns: [
+							{ title: 'Buy At', data: 'buyTime' },
+							{ title: 'SellAt', data: 'sellTime' },
+							{ title: 'Buy Price', data: 'buy' },
+							{ title: 'Sell Price', data: 'sell' },
+							{ title: 'State', data: 'state' },
+							{ title: 'Profit', data: 'profit' }
+						]
+					});
+				} else {
+					alert('获取数据失败');
+				}
+			}
+		});
+	}
+
+	function drawPredictChart(res) {
+		console.log(res);
+		predictChart = new Chart(predictCtx).Line({
+			labels: res.labels,
+			datasets: [
+				{
+					label: '实际',
+					fillColor: "rgba(27,205,0,0.2)",
+					strokeColor: "rgb(130,205,62)",
+					pointColor: "rgb(27,205,0)",
+					pointStrokeColor: "#fff",
+					pointHighlightFill: "#fff",
+					pointHighlightStroke: "rgb(27,205,0)",
+					data: res.actualData
+				},
+				{
+					label: '预测',
+					fillColor: "rgba(151,187,205,0.2)",
+					strokeColor: "rgba(151,187,205,1)",
+					pointColor: "rgba(151,187,205,1)",
+					pointStrokeColor: "#fff",
+					pointHighlightFill: "#fff",
+					pointHighlightStroke: "rgba(151,187,205,1)",
+					data: res.predData
+				}
+			]
+		}, {});
+
+		document.getElementById('predict-legend').innerHTML = predictChart.generateLegend();
+	}
+
+	function drawProfit() {
+			$.ajax({
+				url: "/profit",
+				type: "POST",
+				timeout: 600000,
+				data: {
+					setting_id: settingId,
+					model_setting_id: modelSettingId,
+					index: profitIndex
+				},
+				dataType: 'json',
+				success: function (res) {
+					if (res.code === 200) {
+						const chart = new G2.Chart({
+							container: 'profit',
+							autoFit: true,
+							height: 500,
+							padding: [30, 20, 70, 30]
+						});
+
+						chart.data(res.data);
+
+						chart.axis('close', false);
+
+						chart.legend({
+							custom: true,
+							items: [
+								{ name: 'profit', value: 'profit', marker: { symbol: 'line', style: { stroke: '#1890ff', lineWidth: 2 } } },
+							],
+						});
+
+						chart.line().position('label*profit').color('#1890ff');
+						chart.render();
+						profitIndex++;
+					}
+				}
+			});
+		}
+	function drawEma() {
+		$.ajax({
+			url: "/ema",
+			type: "POST",
+			timeout: 600000,
+			data: {},
+			dataType: 'json',
+			success: function (res) {
+				if (res.code === 200) {
+					const chart = new G2.Chart({
+						container: 'ema',
+						autoFit: true,
+						height: 500,
+						padding: [30, 20, 70, 30]
+					});
+
+					chart.data(res.data.candles);
+
+					chart.axis('close', false);
+
+					chart.legend({
+						custom: true,
+						items: [
+							{ name: 'close', value: 'close', marker: { symbol: 'line', style: { stroke: '#1890ff', lineWidth: 2 } } },
+							{ name: '卖盘', value: 'ask', marker: { symbol: 'line', style: { stroke: '#2fc25b', lineWidth: 2 } } },
+							{ name: '买盘', value: 'bid', marker: { symbol: 'line', style: { stroke: '#c22f5b', lineWidth: 2 } } },
+							// { name: 'ema7', value: 'ema7', marker: { symbol: 'line', style: { stroke: '#2fc25b', lineWidth: 2 } } },
+							// { name: 'ema30', value: 'ema30', marker: { symbol: 'line', style: { stroke: '#c22f5b', lineWidth: 2 } } },
+						],
+					});
+
+					chart.line().position('label*close').color('#1890ff');
+					chart.line().position('label*ask').color('#2fc25b');
+					chart.line().position('label*bid').color('#c22f5b');
+
+					// chart.annotation().dataMarker({
+					// 	top: true,
+					// 	position: ['2016-02-28', 9],
+					// 	text: {
+					// 		content: 'Blockchain 首超 NLP',
+					// 		style: {
+					// 			textAlign: 'left',
+					// 		},
+					// 	},
+					// 	line: {
+					// 		length: 30,
+					// 	},
+					// });
+					// chart.annotation().dataMarker({
+					// 	top: true,
+					// 	position: ['2017-12-17', 100],
+					// 	line: {
+					// 		length: 30,
+					// 	},
+					// 	text: {
+					// 		content: '2017-12-17, 受比特币影响，\n blockchain搜索热度达到顶峰\n峰值：100',
+					// 		style: {
+					// 			textAlign: 'right',
+					// 		}
+					// 	},
+					// });
+
+					chart.render();
+				}
+			}
+		});
+	}
+</script>
+@{end}

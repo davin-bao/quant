@@ -20,24 +20,6 @@ class Order extends Model {
         const currency = self.side === 'buy' ? currencies[1] : currencies[0];
         const account = await Account.getByMarketplaceAndCurrency(marketplace, currency);
 
-        // if(!account) {
-        //     const memo = '账户 ' + marketplace +  '/' + currency + ' 不存在, 终止交易';
-        //     Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
-        //     self.update({
-        //         state: Order.CANCEL,
-        //         memo
-        //     });
-        //     return;
-        // }
-        // if(Decimal(account.available).sub(self.volume).toNumber() < 0){
-        //     const memo = '账户 ' + marketplace +  '/' + currency + ' 余额不足, 终止交易';
-        //     Log.Info(__filename, '发起交易 no：' + self.id + ' ' + memo);
-        //     self.update({
-        //         state: Order.CANCEL,
-        //         memo
-        //     });
-        //     return;
-        // }
         // 发起交易请求
         const mp = MarketplaceManager.get(marketplace, self.market);
         let orderResult = await mp.orders(self.side, self.price, self.volume, self.id, account.account_id);
@@ -93,7 +75,7 @@ class Order extends Model {
                 state: orderResult.state,
                 ttime: new Date().getTime(),
                 memo
-            });
+            }, { transaction: t});
 
             if (orderResult.state === Order.TRADING) {
                 // 锁定

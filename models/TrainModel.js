@@ -1,15 +1,16 @@
 const fs = require('fs');
 const Decimal = require('../definitions/decimal');
-const tf = require('@tensorflow/tfjs');
-const MarketplaceManager = require('../marketplace/Manager');
 const Log = require('../definitions/Log');
 const { Transpose } = require('../definitions/utils');
-const Lstm = require('./Lstm');
+const Lstm = require('../strategy/Lstm');
+const Instrument = require('./Instrument');
 
 require('total.js');
 require('tfjs-node-save');
 
-const TEST_SIZE = 400;
+
+const TARGET_INDEX = 0;
+const TEST_SIZE = 50;
 const STEP_SIZE = 6;
 
 let predLabels = [];
@@ -27,26 +28,29 @@ class TrainModel {
         this.marketplace = options.marketplace;
         this.granularity = parseInt(options.granularity);
         this.stepSize = options.stepSize || STEP_SIZE;
+        this.targetIndex = options.targetIndex || TARGET_INDEX;
         this.lstm = new Lstm({
             market: this.market,
             marketplace: this.marketplace,
             granularity: this.granularity,
-            stepSize: this.stepSize
+            stepSize: this.stepSize,
+            targetIndex: this.targetIndex
         });
     }
 
     async train() {
-        const { labels, candles } = this.getInstruments(TEST_SIZE);
-        this.lstm.trainModel(labels, candles);
+        const { labels, candles } = await this.getInstruments(TEST_SIZE);
+        return await this.lstm.train(labels, candles);
     }
 
-    async do() {
-        const PRED_DIFF = [0.01, 0.08];
+    async test(modelName) {
+        const PRED_DIFF = [0.01, 0.03];
         const LOSS_RATIO = [-0.01, -0.05];
         const WIN_RATIO = [1.5, 2, 3, 4, 5];
 
-        const candlesData = await this.getTestCandles(TEST_SIZE);
-        const predCache = await this.predict(candlesData);
+        const candlesData = await this.getInstruments(TEST_SIZE);
+        const predCache = await this.predict(modelName, candlesData);
+        let resultMax = { percent: 0 };
 
         for (let i = PRED_DIFF[0]; i < PRED_DIFF[1]; i = Decimal(i).add(0.01).toNumber()) {
             for (let j = LOSS_RATIO[0]; j >= LOSS_RATIO[1]; j = Decimal(j).sub(0.01).toNumber()) {
@@ -71,30 +75,35 @@ class TrainModel {
                             actualDatas = actualDatas.slice(0, actualDatas.length - 1).concat(res.actualData);
                             predDatas = predDatas.slice(0, predDatas.length - 1).concat(res.predData);
                         }
-                        const candleRaw = candlesData.candleRaws[index];
-                        this.trade(index + this.stepSize - 1, candleRaw, predDatas, predDiff, lossRatio, winRatio);
+
+                        const currentTime = candlesData.labels[index];
+                        const currentPrice = candlesData.candles[index][this.targetIndex];
+                        this.trade(index + this.stepSize - 1, currentTime, currentPrice, predDatas, predDiff, lossRatio, winRatio);
                         
                         index++;
                     }
-                    const result = this.getProfit(candlesData.candleRaws[index - 1]);
+                    const lastPrice = candlesData.candles[index-1][this.targetIndex];
+                    const result = this.getProfit(lastPrice);
                     console.log(result.profit, predDiff, lossRatio, winRatio);
-                    // return;
+                    if (resultMax.percent < result.percent){
+                        resultMax = result;
+                    }
                 }
             }
         }
+
+        return resultMax;
     }
 
-    async predict(candlesData) {
+    async predict(modelName, candlesData) {
         let predCache = [];
         const cachePath = './logs/candles_' + this.marketplace + '_' + this.market + '_' + this.granularity + '_test_' + TEST_SIZE + '_pred_result.cache';
         if (fs.existsSync(cachePath)) {
             predCache = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
         } else {
-
-            await this.lstm.init();
             let index = 0;
             while (index < candlesData.labels.length) {
-                predCache[index] = await this.lstm.predict(index, candlesData);
+                predCache[index] = await this.lstm.predict(modelName, index, candlesData);
                 index++;
             }
             fs.writeFileSync(cachePath, JSON.stringify(predCache), { encoding: 'utf-8' });
@@ -102,9 +111,7 @@ class TrainModel {
         return predCache;
     }
 
-    getProfit(candleRaw) {
-        const currentPrice = candleRaw.close;
-
+    getProfit(currentPrice) {
         let buyVolumes = 0;
         for (let j = 0; j < orders.length; j++) {
             // 统计未成交单的价值
@@ -119,9 +126,7 @@ class TrainModel {
         return { profit, percent };
     }
 
-    trade(index, candleRaw, predData, predDiff, lossRatio, winRatio) {
-        const currentTime = candleRaw.time;
-        const currentPrice = candleRaw.close;
+    trade(index, currentTime, currentPrice, predData, predDiff, lossRatio, winRatio) {
         const predIndex = index - this.stepSize + 1;
 
         const judge1 = (predData[predIndex + 1] - currentPrice) / currentPrice > predDiff;
@@ -159,9 +164,10 @@ class TrainModel {
         }
     }
 
-    async getInstruments(count = 200) {
+    async getInstruments(limit = 200, offset = 0) {
         const result = await Instrument.findAll({
-            limit: count,
+            offset,
+            limit,
             order: [
                 ['label', 'DESC'],
             ]
@@ -189,32 +195,6 @@ class TrainModel {
         }
         
         return { labels, candles: data };
-    }
-
-    async getCandles(count, cachePath) {
-        let candles = [];
-        let times = parseInt(count / 200);
-
-        if (fs.existsSync(cachePath)) {
-            candles = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-        } else {
-            const mp = await MarketplaceManager.get(this.marketplace, this.market);
-
-            let lastTime = null;
-            while (times > 0) {
-                const firstCandles = await mp.candles(true, this.granularity, lastTime);
-                if (firstCandles.length <= 0) break;
-                candles = candles.concat(firstCandles);
-                lastTime = firstCandles[firstCandles.length - 1].time;
-                times--;
-            }
-
-            candles = candles.reverse();
-            fs.writeFileSync(cachePath, JSON.stringify(candles), { encoding: 'utf-8' });
-        }
-        candles = candles.slice(0, count);
-
-        return candles;
     }
 }
 

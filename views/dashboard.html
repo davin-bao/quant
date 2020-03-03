@@ -424,8 +424,7 @@
             columns: [
                 { title: 'ID', data: 'id', cellType: 'th' },
                 { title: '货币对', data: 'market' },
-                { title: '交易所A', data: 'marketplace_a', orderable: false },
-                { title: '交易所B', data: 'marketplace_b', orderable: false },
+                { title: '交易所', data: 'marketplace', orderable: false },
                 { title: '总交易量', data: 'total' },
                 { title: '成功率', data: 'success_ratio' },
                 { title: '利润', data: 'profit' },
@@ -448,7 +447,7 @@
                     orderable: false,
                     render: function (data, type, row, meta) {
                         if (type === 'display') {
-                            return '<a class="btn btn-info mr-1" href="/dashboard/' + row.id + '/">详情</a>';
+                            return '<a class="btn btn-info mr-1" href="/dashboard/' + row.id + '/">详情</a><a class="btn btn-info mr-1" href="/model_setting/' + row.id + '/">模型</a>';
                         }
 
                         return data;
