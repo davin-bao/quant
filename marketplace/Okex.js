@@ -18,6 +18,7 @@ const tunnel = require('tunnel');
 class Okex extends Marketplace {
 
     constructor(market) {
+        market = market.toUpperCase().replace('_', '-');
         super(market);
 
         const timeout = 30000;
@@ -204,6 +205,7 @@ class Okex extends Marketplace {
         }
         let res = {};
         try{
+            console.log(params);
             res = await this.authClient.spot().postOrder(params);
             Log.request(0, process.env.OKEX_ENDPOINT + '/api/spot/v3/instruments/orders', JSON.stringify(res));
             if(res.error_code && parseInt(res.error_code) !== 0){

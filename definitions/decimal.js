@@ -85,8 +85,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             return this.internal;
         };
 
-        this.toNumber = function() {
-            return Number(this.internal);
+        this.toNumber = function (digits=null) {
+            const res = Number(this.internal);
+            if(!Number.isInteger(digits)) return res;
+            return res.toFixed(digits);
         }
     };
 

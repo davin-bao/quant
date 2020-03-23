@@ -1,0 +1,494 @@
+@{title('首页')}
+
+@{head("../../assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.css")}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="#">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">首页</li>
+</ol>
+@{end}
+<div class="row">
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card bg-transparent">
+            <div class="text-right">
+                <span id="loading" class="spinner-border spinner-border-lg hide" role="status"
+                    aria-hidden="true"></span>
+                <button class="btn mr-1 @{if model.bot.enabled} btn-danger @{else} btn-success @{fi}" id="enable-btn">
+                    <h6>@{if model.bot.enabled} 停止 @{else} 启动 @{fi}</h6>
+                </button>
+                <button class="btn btn-danger" id="reset-btn">
+                    <h6>重置BOT数据</h6>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@{if model.bot && model.exchange}
+<div class="row">
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-cyan text-center">
+                <h6 class="text-white"> 策略： @{model.bot.strategy}</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-cyan text-center">
+                <h6 class="text-white">交易所：@{model.exchange.exchange}</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-cyan text-center">
+                <h6 class="text-white">货币对：@{model.exchange.market.toUpperCase()}</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div id="exchange-state" class="box @{model.exchange.state_css} text-center">
+                <h6 class="text-white">行情状态：@{model.exchange.state.toUpperCase() }</h6>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div id="bot-state" class="box @{model.bot.state_css} text-center">
+                <h6 class="text-white">BOT状态：@{model.bot.state.toUpperCase() }</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-info text-center">
+                <h6 class="text-white">开启模拟: @{model.exchange.simulate}</h6>
+            </div>
+        </div>
+    </div>
+</div>
+@{fi}
+<!-- ============================================================== -->
+<!-- Sales chart -->
+<!-- ============================================================== -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div id="profits" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Active Trades</h5>
+                <div class="table-responsive">
+                    <table id="trade_table" class="table table-striped table-bordered">
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Bot Log</h5>
+                <div class="table-responsive">
+                    <table id="log_table" class="table table-striped table-bordered">
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- Recent comment and chats -->
+<!-- ============================================================== -->
+@{section script}
+<script type="text/javascript" src="../../dist/js/echarts/echarts.min.js"></script>
+<script type="text/javascript" src="../../dist/js/echarts/echarts-gl.min.js"></script>
+<script type="text/javascript" src="../../dist/js/echarts/ecStat.min.js"></script>
+<script type="text/javascript" src="../../dist/js/echarts/dataTool.min.js"></script>
+<script src="../../dist/js/echarts/dark.js"></script>
+
+<script src="../../assets/extra-libs/DataTables/datatables.min.js"></script>
+
+<script type="application/javascript">
+    const bot_balance = "@{model.bot && model.bot.balance}";
+    const bot_id = "@{model.bot && model.bot.id || 0}";
+    const exchange_id = "@{model.exchange && model.exchange.id || 0}";
+    const exchange = "@{model.exchange && model.exchange.exchange || 'okex'}";
+    const market = "@{model.exchange && model.exchange.market || 'ETC_USDT'}";
+
+    let profitChart = null;
+    let profitOptions = {};
+    let profitData = { xAxis: [], legend: [], data: [] };
+
+    let tradeTable = null;
+    let logTable = null;
+
+    function loadClient() {
+        if ("WebSocket" in window) {
+            console.log("connecting ws://localhost:8080");
+
+            // 打开一个 web socket
+            var ws = new WebSocket("ws://localhost:8080");
+
+            ws.onopen = function () {
+                console.log("connected");
+                // Web Socket 已连接上，使用 send() 方法发送数据
+                ws.send(JSON.stringify({ channel: 'subscribe/exchange', data: { id: exchange_id } }));
+                ws.send(JSON.stringify({ channel: 'subscribe/bot', data: { id: bot_id } }));
+                ws.send(JSON.stringify({ channel: 'subscribe/profit', data: { id: bot_id } }));
+                ws.send(JSON.stringify({ channel: 'subscribe/bot_log', data: { id: bot_id } }));
+                ws.send(JSON.stringify({ channel: 'subscribe/trade_active', data: { id: bot_id } }));
+                ws.send(JSON.stringify({ channel: 'subscribe/candle60s', data: { exchange, market } }));
+            };
+
+            let i = 4;
+            ws.onmessage = function (evt) {
+                var received_msg = JSON.parse(evt.data);
+                console.log(received_msg);
+                switch (received_msg.channel) {
+                    case 'subscribe/candle60s':
+                        // updateKline(received_msg.data);
+                        break;
+                    case 'subscribe/exchange':
+                        $('#exchange-state h6').html('行情状态：' + received_msg.data.state.toUpperCase());
+                        if (received_msg.data.state === 'stoped') {
+                            $('#exchange-state').removeClass('bg-success').addClass('bg-danger');
+                        } else {
+                            $('#exchange-state').removeClass('bg-danger').addClass('bg-success');
+                        }
+                        break;
+                    case 'subscribe/bot':
+                        $('#bot-state h6').html('BOT状态：' + received_msg.data.state.toUpperCase());
+                        if (received_msg.data.state === 'stoped') {
+                            $('#bot-state').removeClass('bg-success').addClass('bg-danger');
+                        } else {
+                            $('#bot-state').removeClass('bg-danger').addClass('bg-success');
+                        }
+                        break;
+                    case 'subscribe/profit':
+                        const { id, value, legend, xAxis } = received_msg.data;
+                        profitData.xAxis.push(xAxis);
+                        for (const item of profitData.data) {
+                            if (item.legend === legend) {
+                                item.value.push(value);
+                            }
+                        }
+                        profitOptions = getProfitsOptions();
+                        if (profitOptions && typeof profitOptions === "object") {
+                            profitChart.setOption(profitOptions, true);
+                        }
+                        break;
+                    case 'subscribe/bot_log':
+                        const { rowData } = received_msg.data;
+                        const rowNode = logTable.row.add(rowData).draw().node();
+                        $(logTable.table().body()).prepend($(rowNode));
+                        break;
+                    case 'subscribe/trade_active':
+                        const { trades } = received_msg.data;
+                        tradeTableData = [];
+                        for (const row of trades) {
+                            tradeTableData.push([
+                                row.id + '',
+                                row.state,
+                                row.buy_price + '',
+                                row.buy_qty + '',
+                                row.sell_price + '',
+                                row.sell_qty + '',
+                                row.bought_at + '',
+                                row.sold_at + '',
+                                row.profit + '',
+                                row.memo
+                            ]);
+                        }
+                        
+                        tradeTable.rows().remove();
+                        tradeTable.rows.add(tradeTableData).draw(false);
+                        break;
+                }
+            };
+
+            ws.onclose = function () {
+                // 关闭 websocket
+                console.log("连接已关闭!");
+            };
+
+            window.onbeforeunload = function (event) {
+                ws.close();
+            };
+        }
+    }
+
+    function getProfitsOptions() {
+        const initBalance = bot_balance;
+        const currBalance = profitData.data[0].value.slice(-1)[0];
+        const percent = ((currBalance + initBalance) * 100 /initBalance).toFixed(3) + ' %';
+
+        const { legend, xAxis, data } = profitData;
+        const series = [];
+        for (const item of data) {
+            series.push({
+                name: item.legend,
+                type: 'line',
+                stack: item.legend,
+                // label: {
+                //     normal: {
+                //         show: true,
+                //         position: 'top'
+                //     }
+                // },
+                areaStyle: {},
+                data: item.value
+            });
+        }
+
+        return {
+            title: {
+                text: '收益 ' + percent
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross',
+                    label: {
+                        backgroundColor: '#6a7985'
+                    }
+                }
+            },
+            legend: {
+                data: legend
+            },
+            toolbox: {
+                feature: {
+                    saveAsImage: {}
+                }
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: [
+                {
+                    type: 'category',
+                    boundaryGap: true,
+                    data: xAxis
+                }
+            ],
+            yAxis: [
+                {
+                    type: 'value',
+                    scale: true, 
+                }
+            ],
+            series
+        };
+    }
+
+    function loadProfits() {
+        var dom = document.getElementById("profits");
+        profitChart = echarts.init(dom);
+
+
+        $.ajax({
+            url: "/dashboard_exchange_profits/" + bot_id,
+            type: "GET",
+            data: {},
+            dataType: 'json',
+            success: function (res) {
+                if (res.code === 200) {
+                    profitData = res.data;
+
+                    profitOptions = getProfitsOptions();
+                    if (profitOptions && typeof profitOptions === "object") {
+                        profitChart.setOption(profitOptions, true);
+                    }
+                }
+            },
+            error: function (e) {
+                console.log(e.statusText);
+            },
+            complete: function () {
+                $('#enable-btn').removeClass('hide');
+                $('#loading').addClass('hide');
+            }
+        });
+    }
+
+    function loadTrades() {
+        tradeTable = $('#trade_table').dataTable({
+            "searching": false,
+            // 是否允许排序
+            "ordering": true,
+            "order": [[0, 'desc']],
+            "info": true,
+            // 是否允许翻页，设成false，翻页按钮不显示
+            "paging": false,
+            "lengthChange": false,
+            "pageLength": 50,
+            "pagingType": "numbers",
+            "autoWidth": true,
+            // 是否表示 "processing" 加载中的信息，这个信息可以修改
+            "processing": true,
+            // 每次创建是否销毁以前的DataTable,默认false
+            "destroy": false,
+            "data": [],
+            "columns": [
+                { "title": "id", "class": "center" },
+                { "title": "state", "class": "center" },
+                { "title": "buy_price", "class": "center" },
+                { "title": "buy_qty", "class": "center" },
+                { "title": "sell_price", "class": "center" },
+                { "title": "sell_qty", "class": "center" },
+                { "title": "bought_at", "class": "center" },
+                { "title": "sold_at", "class": "center" },
+                { "title": "profit", "class": "center" },
+                { "title": "memo" },
+            ]
+        }).api();
+    }
+
+    function loadLog() {
+        logTable = $('#log_table').dataTable({
+            "searching": false,
+            // 是否允许排序
+            "ordering": true,
+            "order": [[0, 'desc']],
+            "info": true,
+            // 是否允许翻页，设成false，翻页按钮不显示
+            "paging": false,
+            "lengthChange": false,
+            "pageLength": 50,
+            "pagingType": "numbers",
+            "autoWidth": true,
+            // 是否表示 "processing" 加载中的信息，这个信息可以修改
+            "processing": true,
+            // 每次创建是否销毁以前的DataTable,默认false
+            "destroy": false,
+            "data": [],
+            "columns": [
+                { "title": "id", "class": "center" },
+                { "title": "type", "class": "center" },
+                { "title": "memo" },
+                { "title": "ctime", "class": "center" }
+            ]
+        }).api();
+
+        $.ajax({
+            url: "/dashboard_bot_logs/" + bot_id,
+            type: "GET",
+            data: {
+                length: 999,
+                start: 0,
+            },
+            dataType: 'json',
+            success: function (res) {
+                if (res.code === 200) {
+                    const data = [];
+                    for(const row of res.data){
+                        data.push([
+                            row.id + '',
+                            row.type,
+                            row.memo,
+                            row.ctime + ''
+                        ]);
+                    }
+                    logTable.rows.add(data).draw(false);
+                }
+            },
+            error: function (e) {
+                console.log(e.statusText);
+            }
+        });
+    }
+
+    $('#enable-btn').on('click', function () {
+        $('#enable-btn').addClass('hide');
+        $('#loading').removeClass('hide');
+
+        $.ajax({
+            url: "/bot_enable/" + bot_id,
+            type: "POST",
+            data: {},
+            dataType: 'json',
+            success: function (res) {
+                if (res.code === 200) {
+                    $('#enable-btn h6').html(res.data.enabled ? '停止' : '启动');
+                    res.data.enabled ? $('#enable-btn').removeClass('btn-success').addClass('btn-danger') : $('#enable-btn').removeClass('btn-danger').addClass('btn-success');
+                }
+            },
+            error: function (e) {
+                console.log(e.statusText);
+            },
+            complete: function () {
+                $('#enable-btn').removeClass('hide');
+                $('#loading').addClass('hide');
+            }
+        });
+    });
+
+    $('#reset-btn').on('click', function () {
+        $('#reset-btn').addClass('hide');
+        $('#loading').removeClass('hide');
+
+        $.ajax({
+            url: "/bot_reset/" + bot_id,
+            type: "POST",
+            data: {},
+            dataType: 'json',
+            success: function (res) {
+                //
+            },
+            error: function (e) {
+                console.log(e.statusText);
+            },
+            complete: function () {
+                $('#reset-btn').removeClass('hide');
+                $('#loading').addClass('hide');
+            }
+        });
+    });
+
+    $(function () {
+        loadProfits();
+
+        loadTrades();
+
+        loadLog();
+
+        loadClient();
+    });
+</script>
+@{end}

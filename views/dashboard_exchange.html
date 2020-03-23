@@ -1,0 +1,539 @@
+@{title('首页')}
+
+@{head("../../assets/libs/datatables.net-bs4/css/dataTables.bootstrap4.css")}
+
+@{section breadcrumb}
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="#">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">首页</li>
+</ol>
+@{end}
+<div class="row">
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card bg-transparent">
+            <div class="text-right">
+                <span id="loading" class="spinner-border spinner-border-lg hide" role="status"
+                    aria-hidden="true"></span>
+                <button class="btn btn-info" id="enable-btn">
+                    <h6><a class="btn btn-info mr-1" href="/dashboard_bot/@{model.exchange && model.exchange.id}/">交易</a></h6>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@{if model.exchange}
+<div class="row">
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-cyan text-center">
+                <h6 class="text-white">交易所：@{model.exchange.exchange}</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div class="box bg-cyan text-center">
+                <h6 class="text-white">货币对：@{model.exchange.market.toUpperCase()}</h6>
+            </div>
+        </div>
+    </div>
+    <!-- Column -->
+    <div class="col-md-6 col-lg-2 col-xlg-3">
+        <div class="card card-hover">
+            <div id="exchange-state" class="box @{model.exchange.state_css} text-center">
+                <h6 class="text-white">行情状态：@{model.exchange.state.toUpperCase() }</h6>
+            </div>
+        </div>
+    </div>
+</div>
+@{fi}
+<!-- ============================================================== -->
+<!-- Sales chart -->
+<!-- ============================================================== -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Real Time Chart</h5>
+                <div id="k-line" style="height: 800px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- Recent comment and chats -->
+<!-- ============================================================== -->
+@{section script}
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl/dist/echarts-gl.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-stat/dist/ecStat.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/extension/dataTool.min.js"></script>
+<script src="../../dist/js/dark.js"></script>
+
+<script src="../../assets/extra-libs/DataTables/datatables.min.js"></script>
+
+<script type="application/javascript">
+    const auotation_id = "@{model.exchange && model.exchange.id || 0}";
+    const exchange = "@{model.exchange && model.exchange.exchange || 'okex'}";
+    const market = "@{model.exchange && model.exchange.market || 'ETC_USDT'}";
+
+    let kLineChart = null;
+    let kLineData = [];
+
+    function loadKline() {
+        $.ajax({
+            url: "/auotation_candle/" + auotation_id,
+            type: "GET",
+            data: { type: 'candle60s' },
+            dataType: 'json',
+            success: function (res) {
+                for (const item of res.data) {
+                    kLineData.push([
+                        item.time,
+                        item.start,
+                        item.end,
+                        item.min,
+                        item.max,
+                        item.volumn,
+                        item.timestamp
+                    ]);
+                    console.log(kLineData);
+                }
+                drawKline();
+            },
+            error: function (e) {
+                console.log(e.statusText);
+            }
+        });
+    }
+
+    function kLineDataPush(data) {
+        let has = false;
+        for (let i = 0; i < kLineData.length; i++) {
+            const item = kLineData[i];
+            if (item[6] === data.timestamp) {
+                has = true;
+                kLineData[i] = [
+                    data.time,
+                    data.start,
+                    data.end,
+                    data.min,
+                    data.max,
+                    data.volumn,
+                    data.timestamp
+                ];
+            }
+        }
+        if (!has) {
+            kLineData.push([
+                data.time,
+                data.start,
+                data.end,
+                data.min,
+                data.max,
+                data.volumn,
+                data.timestamp
+            ]);
+        }
+    }
+
+    function splitData(rawData) {
+        var categoryData = [];
+        var values = [];
+        var volumes = [];
+        for (var i = 0; i < rawData.length; i++) {
+            categoryData.push(rawData[i][0]);
+            var value = rawData[i].slice(1, rawData[i].length);
+            values.push(value);
+            volumes.push([i, rawData[i][5], rawData[i][1] > rawData[i][2] ? 1 : -1]);
+        }
+
+        return {
+            categoryData: categoryData,
+            values: values,
+            volumes: volumes
+        };
+    }
+
+    function calculateMA(dayCount, data) {
+        var result = [];
+        for (var i = 0, len = data.values.length; i < len; i++) {
+            if (i < dayCount) {
+                result.push('-');
+                continue;
+            }
+            var sum = 0;
+            for (var j = 0; j < dayCount; j++) {
+                sum += data.values[i - j][1];
+            }
+            result.push(+(sum / dayCount).toFixed(3));
+        }
+        return result;
+    }
+
+    function drawKline() {
+        var dom = document.getElementById("k-line");
+        kLineChart = echarts.init(dom, 'dark');
+        var app = {};
+        option = null;
+        var upColor = '#FD1050';
+        var downColor = '#0CF49B';
+
+        var data = splitData(kLineData);
+
+        kLineChart.setOption(option = {
+            backgroundColor: '#21202D',
+            animation: false,
+            padding: [3, 4, 5, 6],
+            legend: {
+                bottom: 10,
+                left: 'center',
+                data: ['Dow-Jones index', 'MA5', 'MA10', 'MA20', 'MA30']
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross'
+                },
+                backgroundColor: 'rgba(245, 245, 245, 0.8)',
+                borderWidth: 1,
+                borderColor: '#ccc',
+                padding: 10,
+                textStyle: {
+                    color: '#000'
+                },
+                position: function (pos, params, el, elRect, size) {
+                    var obj = { top: 10 };
+                    obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+                    return obj;
+                }
+            },
+            axisPointer: {
+                link: { xAxisIndex: 'all' },
+                label: {
+                    backgroundColor: '#777'
+                }
+            },
+            // toolbox: {
+            //     feature: {
+            //         dataZoom: {
+            //             yAxisIndex: false
+            //         },
+            //         brush: {
+            //             type: ['lineX', 'clear']
+            //         }
+            //     }
+            // },
+            // brush: {
+            //     xAxisIndex: 'all',
+            //     brushLink: 'all',
+            //     outOfBrush: {
+            //         colorAlpha: 0.1
+            //     }
+            // },
+            visualMap: {
+                show: false,
+                seriesIndex: 5,
+                dimension: 2,
+                pieces: [{
+                    value: 1,
+                    color: downColor
+                }, {
+                    value: -1,
+                    color: upColor
+                }]
+            },
+            grid: [
+                {
+                    left: '10%',
+                    right: '8%',
+                    height: '50%'
+                },
+                {
+                    left: '10%',
+                    right: '8%',
+                    top: '63%',
+                    height: '16%'
+                }
+            ],
+            xAxis: [
+                {
+                    type: 'category',
+                    data: data.categoryData,
+                    scale: true,
+                    boundaryGap: true,
+                    axisLine: { onZero: false },
+                    splitLine: { show: false },
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax',
+                    axisPointer: {
+                        z: 100
+                    }
+                },
+                {
+                    type: 'category',
+                    gridIndex: 1,
+                    data: data.categoryData,
+                    scale: true,
+                    boundaryGap: true,
+                    axisLine: { onZero: false },
+                    axisTick: { show: false },
+                    splitLine: { show: false },
+                    axisLabel: { show: false },
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
+                }
+            ],
+            yAxis: [
+                {
+                    scale: true,
+                    axisLine: { lineStyle: { color: '#8392A5' } },
+                    splitLine: { show: true },
+                },
+                {
+                    scale: true,
+                    gridIndex: 1,
+                    splitNumber: 2,
+                    axisLabel: { show: false },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    splitLine: { show: false }
+                }
+            ],
+            dataZoom: [
+                {
+                    type: 'inside',
+                    xAxisIndex: [0, 1],
+                    start: 0,
+                    end: 100
+                },
+                {
+                    show: true,
+                    xAxisIndex: [0, 1],
+                    type: 'slider',
+                    top: '85%',
+                    start: 0,
+                    end: 100
+                }
+            ],
+            series: [
+                {
+                    name: 'Index',
+                    type: 'candlestick',
+                    data: data.values,
+                    itemStyle: {
+                        color: upColor,
+                        color0: downColor,
+                        borderColor: null,
+                        borderColor0: null
+                    },
+                    tooltip: {
+                        formatter: function (param) {
+                            var param1 = param[0];
+                            return [
+                                'Date: ' + param1.name + '<hr size=1 style="margin: 3px 0">',
+                                'Open: ' + param1.data[0] + '<br/>',
+                                'Close: ' + param1.data[1] + '<br/>',
+                                'Lowest: ' + param1.data[2] + '<br/>',
+                                'Highest: ' + param1.data[3] + '<br/>'
+                            ].join('');
+                        }
+                    },
+                    markPoint: {
+                        data: [
+                            {
+                                name: 'XX标点',
+                                coord: ['2020-03-10T09:11:00.000Z', 6.68],
+                                value: 'buy',
+                                itemStyle: {
+                                    color: 'rgb(41,60,85)'
+                                }
+                            }
+                        ],
+                        tooltip: {
+                            formatter: function (param) {
+                                return param.name + '<br>' + (param.data.coord || '');
+                            }
+                        }
+                    },
+                },
+                {
+                    name: 'MA5',
+                    type: 'line',
+                    data: calculateMA(5, data),
+                    smooth: true,
+                    lineStyle: {
+                        opacity: 0.5
+                    }
+                },
+                {
+                    name: 'MA10',
+                    type: 'line',
+                    data: calculateMA(10, data),
+                    smooth: true,
+                    lineStyle: {
+                        opacity: 0.5
+                    }
+                },
+                {
+                    name: 'MA20',
+                    type: 'line',
+                    data: calculateMA(20, data),
+                    smooth: true,
+                    lineStyle: {
+                        opacity: 0.5
+                    }
+                },
+                {
+                    name: 'MA30',
+                    type: 'line',
+                    data: calculateMA(30, data),
+                    smooth: true,
+                    lineStyle: {
+                        opacity: 0.5
+                    }
+                },
+                {
+                    name: 'Volume',
+                    type: 'bar',
+                    xAxisIndex: 1,
+                    yAxisIndex: 1,
+                    data: data.volumes
+                },
+            ]
+        }, true);
+
+        kLineChart.dispatchAction({
+            type: 'brush',
+            areas: [
+                {
+                    brushType: 'lineX',
+                    coordRange: ['2020-03-09', '2020-03-10'],
+                    xAxisIndex: 0
+                }
+            ]
+        });
+
+        if (option && typeof option === "object") {
+            kLineChart.setOption(option, true);
+        }
+    }
+
+    function updateKline(data) {
+        kLineDataPush(data);
+
+        var data = splitData(kLineData);
+        kLineChart.setOption({
+            xAxis: [
+                {
+                    type: 'category',
+                    data: data.categoryData,
+                    scale: true,
+                    boundaryGap: true,
+                    axisLine: { onZero: false },
+                    splitLine: { show: false },
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax',
+                    axisPointer: {
+                        z: 100
+                    }
+                },
+                {
+                    type: 'category',
+                    gridIndex: 1,
+                    data: data.categoryData,
+                    scale: true,
+                    boundaryGap: true,
+                    axisLine: { onZero: false },
+                    axisTick: { show: false },
+                    splitLine: { show: false },
+                    axisLabel: { show: false },
+                    splitNumber: 20,
+                    min: 'dataMin',
+                    max: 'dataMax'
+                }
+            ],
+            series: [
+                {
+                    name: 'Index',
+                    data: data.values,
+                },
+                {
+                    name: 'MA5',
+                    data: calculateMA(5, data),
+                },
+                {
+                    name: 'MA10',
+                    data: calculateMA(10, data),
+                },
+                {
+                    name: 'MA20',
+                    data: calculateMA(20, data),
+                },
+                {
+                    name: 'MA30',
+                    data: calculateMA(30, data),
+                },
+                {
+                    name: 'Volume',
+                    data: data.volumes
+                }
+            ]
+        });
+    }
+
+    $(function () {
+        loadKline();
+
+        if ("WebSocket" in window) {
+            console.log("您的浏览器支持 WebSocket!");
+
+            // 打开一个 web socket
+            var ws = new WebSocket("ws://localhost:8080");
+
+            ws.onopen = function () {
+                // Web Socket 已连接上，使用 send() 方法发送数据
+                ws.send(JSON.stringify({ channel: 'subscribe/candle60s', data: { exchange, market } }));
+                console.log("数据发送中...");
+            };
+
+            let i = 4;
+            ws.onmessage = function (evt) {
+                var received_msg = JSON.parse(evt.data);
+
+                switch (received_msg.channel) {
+                    case 'subscribe/candle60s':
+                        updateKline(received_msg.data);
+                        break;
+                }
+            };
+
+            ws.onclose = function () {
+                // 关闭 websocket
+                console.log("连接已关闭...");
+            };
+        }
+    });
+</script>
+@{end}
