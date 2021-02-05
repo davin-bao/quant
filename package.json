@@ -26,7 +26,7 @@
     "sequelize": "^5.19.0",
     "sqlite3": "^4.1.0",
     "tfjs-node-save": "0.0.2",
-    "total.js": "3.3.2",
+    "total.js": "3.4.7",
     "tunnel": "0.0.6"
   }
 }
